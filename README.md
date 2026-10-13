@@ -62,6 +62,7 @@ npm run build
 
 - [구현 계획과 설계](docs/IMPLEMENTATION_PLAN.md)
 - [성능 측정 프로토콜](docs/PERFORMANCE.md)
+- [프로젝트 기준 문서와 초기 검증 결과](docs/PROJECT_GUIDE.md)
 
 ## 다음 구현
 
