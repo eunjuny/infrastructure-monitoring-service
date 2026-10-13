@@ -1,0 +1,21 @@
+server:
+  address: 127.0.0.1
+  port: 8081
+spring:
+  application:
+    name: infrastructure-monitoring-service
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://127.0.0.1:5544/monitoring}
+    username: ${DATABASE_USER:monitoring}
+    password: ${DATABASE_PASSWORD:local-monitoring-only}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
