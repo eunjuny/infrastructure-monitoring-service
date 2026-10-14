@@ -1,0 +1,19 @@
+name: infrastructure-monitoring-service
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: monitoring
+      POSTGRES_USER: monitoring
+      POSTGRES_PASSWORD: local-monitoring-only
+    ports:
+      - "127.0.0.1:5544:5432"
+    volumes:
+      - monitoring-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U monitoring -d monitoring"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+volumes:
+  monitoring-db:
