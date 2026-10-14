@@ -1,0 +1,2141 @@
+{
+  "date": "2026-10-14",
+  "measurement": "CPU 4x, cache OFF, actual local PostgreSQL/API, DOM readiness plus two RAF callbacks; renderer RSS is not Chrome tab memory footprint",
+  "runs": [
+    {
+      "label": "baseline-detail",
+      "environment": {
+        "date": "2026-10-13T16:55:11.395Z",
+        "cpu": "Apple M1 Pro",
+        "physicalMemory": 17179869184,
+        "browser": "156.0.8078.4",
+        "node": "v22.23.2",
+        "cpuThrottle": 4,
+        "cacheDisabled": true,
+        "networkThrottle": "none",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "repetitions": 20
+      },
+      "summary": {
+        "initial": {
+          "count": 20,
+          "median": 301.75,
+          "p95": 320.7,
+          "max": 519.9,
+          "target": 500,
+          "overTarget": 1
+        },
+        "expandCold": {
+          "count": 20,
+          "median": 43.900000000000006,
+          "p95": 46.6,
+          "max": 47.1,
+          "target": 100,
+          "overTarget": 0
+        },
+        "expandWarm": {
+          "count": 20,
+          "median": 28.75,
+          "p95": 30.5,
+          "max": 31.1,
+          "target": 100,
+          "overTarget": 0
+        },
+        "collapse": {
+          "count": 20,
+          "median": 28.9,
+          "p95": 30.1,
+          "max": 31.5,
+          "target": 100,
+          "overTarget": 0
+        },
+        "search": {
+          "count": 20,
+          "median": 50.849999999999994,
+          "p95": 116,
+          "max": 117.4,
+          "target": 300,
+          "overTarget": 0
+        },
+        "filter": {
+          "count": 20,
+          "median": 34.05,
+          "p95": 48.5,
+          "max": 50.8,
+          "target": 200,
+          "overTarget": 0
+        },
+        "refresh": {
+          "count": 20,
+          "median": 60.6,
+          "p95": 63.2,
+          "max": 63.2,
+          "target": 200,
+          "overTarget": 0
+        },
+        "refreshFivePages": {
+          "count": 20,
+          "median": 79.19999999999999,
+          "p95": 81.4,
+          "max": 94.8,
+          "target": 200,
+          "overTarget": 0
+        }
+      },
+      "measurements": {
+        "initial": [
+          519.9,
+          305.2,
+          313.2,
+          302.2,
+          289.8,
+          300.1,
+          294.9,
+          301,
+          320.7,
+          300.8,
+          320.3,
+          307.5,
+          295.8,
+          301.3,
+          294.2,
+          284.8,
+          302.2,
+          302.9,
+          288.2,
+          303.4
+        ],
+        "expandCold": [
+          43.5,
+          45.6,
+          44.5,
+          47.1,
+          44.4,
+          43.7,
+          45.2,
+          45.8,
+          42.4,
+          43.3,
+          44.1,
+          42,
+          43.7,
+          42.5,
+          42.4,
+          43.6,
+          44.3,
+          45.7,
+          46.6,
+          42.9
+        ],
+        "expandWarm": [
+          26.3,
+          28.9,
+          28.9,
+          29.1,
+          28,
+          28,
+          28.1,
+          28.6,
+          28.1,
+          29,
+          28.2,
+          29.6,
+          28.2,
+          31.1,
+          29.8,
+          29.7,
+          27.3,
+          27.9,
+          30.4,
+          30.5
+        ],
+        "collapse": [
+          27.2,
+          26.1,
+          26.7,
+          29.9,
+          28.2,
+          28.8,
+          25.2,
+          29.4,
+          29.1,
+          30.1,
+          28,
+          29.7,
+          27.4,
+          29,
+          28.7,
+          29.3,
+          29.1,
+          31.5,
+          28.4,
+          29.5
+        ],
+        "search": [
+          55.7,
+          49.1,
+          49.7,
+          50.9,
+          50.8,
+          50.7,
+          49.4,
+          48.7,
+          51.2,
+          63.6,
+          31.5,
+          117.4,
+          66.7,
+          99.2,
+          116,
+          52,
+          102.8,
+          49,
+          46.5,
+          50.6
+        ],
+        "filter": [
+          43.1,
+          33.5,
+          48.5,
+          33,
+          33.8,
+          50.8,
+          32.7,
+          34.9,
+          34.1,
+          33.9,
+          34.4,
+          31,
+          34.1,
+          34,
+          31.7,
+          48.4,
+          33.5,
+          48.5,
+          33.1,
+          47.7
+        ],
+        "refresh": [
+          63.1,
+          60.7,
+          60.6,
+          46,
+          63.2,
+          44.4,
+          60.2,
+          46.3,
+          61.9,
+          61.7,
+          60.9,
+          61,
+          44.2,
+          63.2,
+          60.6,
+          60.6,
+          62.7,
+          44.8,
+          60.4,
+          59.3
+        ],
+        "refreshFivePages": [
+          79.4,
+          80.8,
+          94.8,
+          80.6,
+          78.6,
+          79.6,
+          79.1,
+          79.1,
+          78.4,
+          78.5,
+          78.6,
+          80,
+          79.3,
+          75.9,
+          81.4,
+          77.2,
+          80.2,
+          76.7,
+          79.4,
+          76.8
+        ]
+      },
+      "initialDetails": [
+        {
+          "rootReady": 519.8999998569489,
+          "longTasks": [
+            {
+              "start": 71.5,
+              "duration": 320
+            }
+          ],
+          "resources": [
+            {
+              "name": "/assets/index-B9q6MNNw.js",
+              "duration": 6.5,
+              "start": 38,
+              "responseEnd": 44.5,
+              "transfer": 38106
+            },
+            {
+              "name": "/assets/index-R6h6tBbu.css",
+              "duration": 3.3999998569488525,
+              "start": 38.5,
+              "responseEnd": 41.89999985694885,
+              "transfer": 4585
+            },
+            {
+              "name": "/api/resources",
+              "duration": 13.5,
+              "start": 365.09999990463257,
+              "responseEnd": 378.59999990463257,
+              "transfer": 3142
+            },
+            {
+              "name": "/api/resources/summary",
+              "duration": 40.09999990463257,
+              "start": 368.2999999523163,
+              "responseEnd": 408.39999985694885,
+              "transfer": 359
+            },
+            {
+              "name": "/api/resources",
+              "duration": 17.299999952316284,
+              "start": 371.7999999523163,
+              "responseEnd": 389.09999990463257,
+              "transfer": 19572
+            }
+          ],
+          "domContentLoaded": 383.89999985694885
+        }
+      ],
+      "errors": [],
+      "scroll": {
+        "compositorFPS": 59.84518376477788,
+        "rafFPS": 60.003000150007516,
+        "duration": 4015.2999999999993,
+        "framesAbove33ms": 0,
+        "drawFrames": 240,
+        "visibleRows": 19,
+        "documentElements": 610
+      },
+      "memory": {
+        "cdp": {
+          "Documents": 1,
+          "Nodes": 2618,
+          "LayoutCount": 335,
+          "JSHeapUsedSize": 7492348,
+          "JSHeapTotalSize": 23494656
+        }
+      }
+    },
+    {
+      "label": "after-layout-timeout",
+      "environment": {
+        "date": "2026-10-13T16:57:29.672Z",
+        "cpu": "Apple M1 Pro",
+        "physicalMemory": 17179869184,
+        "browser": "156.0.8078.4",
+        "node": "v22.23.2",
+        "cpuThrottle": 4,
+        "cacheDisabled": true,
+        "networkThrottle": "none",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "repetitions": 20
+      },
+      "summary": {
+        "initial": {
+          "count": 20,
+          "median": 304.4,
+          "p95": 317.9,
+          "max": 470.8,
+          "target": 500,
+          "overTarget": 0
+        },
+        "expandCold": {
+          "count": 20,
+          "median": 44.2,
+          "p95": 46,
+          "max": 47,
+          "target": 100,
+          "overTarget": 0
+        },
+        "expandWarm": {
+          "count": 20,
+          "median": 29.25,
+          "p95": 30.7,
+          "max": 30.7,
+          "target": 100,
+          "overTarget": 0
+        },
+        "collapse": {
+          "count": 20,
+          "median": 28.5,
+          "p95": 29.2,
+          "max": 29.9,
+          "target": 100,
+          "overTarget": 0
+        },
+        "search": {
+          "count": 20,
+          "median": 52.45,
+          "p95": 118.1,
+          "max": 119.7,
+          "target": 300,
+          "overTarget": 0
+        },
+        "filter": {
+          "count": 20,
+          "median": 35.75,
+          "p95": 51,
+          "max": 51.3,
+          "target": 200,
+          "overTarget": 0
+        },
+        "refresh": {
+          "count": 20,
+          "median": 60.05,
+          "p95": 62.7,
+          "max": 63.2,
+          "target": 200,
+          "overTarget": 0
+        },
+        "refreshFivePages": {
+          "count": 20,
+          "median": 79.05,
+          "p95": 95.2,
+          "max": 95.7,
+          "target": 200,
+          "overTarget": 0
+        }
+      },
+      "measurements": {
+        "initial": [
+          470.8,
+          310.5,
+          300.7,
+          308.6,
+          317.9,
+          275,
+          303.5,
+          302.9,
+          311.3,
+          307.8,
+          291.7,
+          305.3,
+          310.1,
+          302.9,
+          293.9,
+          301.9,
+          271.2,
+          310.3,
+          286,
+          316.3
+        ],
+        "expandCold": [
+          43.9,
+          45.4,
+          45.7,
+          43.8,
+          46,
+          44.8,
+          43.7,
+          42.8,
+          43,
+          47,
+          44.7,
+          43.5,
+          44.4,
+          44.1,
+          44.9,
+          44.8,
+          42.6,
+          43.6,
+          44.3,
+          44
+        ],
+        "expandWarm": [
+          28.5,
+          28,
+          29.6,
+          29.9,
+          28.5,
+          29.6,
+          29.5,
+          29.3,
+          28.9,
+          29.5,
+          27.1,
+          29.9,
+          26.7,
+          29.4,
+          28.7,
+          30.7,
+          29.2,
+          28.9,
+          30.7,
+          27.5
+        ],
+        "collapse": [
+          28.9,
+          28.7,
+          27.7,
+          28.5,
+          28.2,
+          27.5,
+          29.1,
+          28.7,
+          29.9,
+          29.2,
+          29.2,
+          27.7,
+          27.1,
+          28.5,
+          27.2,
+          28.4,
+          27.5,
+          28.7,
+          28.5,
+          28.8
+        ],
+        "search": [
+          119.7,
+          33.2,
+          118.1,
+          50.2,
+          66.4,
+          48.6,
+          47,
+          64.9,
+          32.5,
+          52.3,
+          51.6,
+          64.1,
+          52.3,
+          102.2,
+          32.7,
+          98.4,
+          68,
+          52.6,
+          82,
+          51.8
+        ],
+        "filter": [
+          33.7,
+          51.3,
+          32.8,
+          32.9,
+          51,
+          33.4,
+          35.6,
+          48.9,
+          35.9,
+          47.8,
+          35.1,
+          35.5,
+          46.5,
+          33.5,
+          32.6,
+          36.3,
+          49.2,
+          50.1,
+          33.8,
+          50
+        ],
+        "refresh": [
+          60.9,
+          61.1,
+          45.7,
+          61.1,
+          46.2,
+          46.2,
+          59.7,
+          46.1,
+          44.6,
+          60.1,
+          60.9,
+          61.1,
+          60.6,
+          58.8,
+          60.8,
+          62.7,
+          63.2,
+          60,
+          59.9,
+          44.4
+        ],
+        "refreshFivePages": [
+          78.3,
+          78.7,
+          79.6,
+          78.6,
+          94.8,
+          79,
+          77.4,
+          76.7,
+          80.9,
+          78.8,
+          80.2,
+          78.4,
+          78.6,
+          79.8,
+          79.8,
+          95.7,
+          79.1,
+          95.2,
+          79.5,
+          77.4
+        ]
+      },
+      "initialDetails": [
+        {
+          "rootReady": 470.80000019073486,
+          "longTasks": [
+            {
+              "start": 65.10000014305115,
+              "duration": 292
+            }
+          ],
+          "resources": [
+            {
+              "name": "/assets/index-BRWcEIa5.js",
+              "duration": 6.700000047683716,
+              "start": 29.600000143051147,
+              "responseEnd": 36.30000019073486,
+              "transfer": 38253
+            },
+            {
+              "name": "/assets/index-R6h6tBbu.css",
+              "duration": 3.3000001907348633,
+              "start": 30.5,
+              "responseEnd": 33.80000019073486,
+              "transfer": 4585
+            },
+            {
+              "name": "/api/resources",
+              "duration": 6.200000047683716,
+              "start": 216.60000014305115,
+              "responseEnd": 222.80000019073486,
+              "transfer": 3131
+            },
+            {
+              "name": "/api/resources/summary",
+              "duration": 29,
+              "start": 220.70000004768372,
+              "responseEnd": 249.70000004768372,
+              "transfer": 359
+            },
+            {
+              "name": "/api/resources",
+              "duration": 8.900000095367432,
+              "start": 341,
+              "responseEnd": 349.90000009536743,
+              "transfer": 19572
+            }
+          ],
+          "domContentLoaded": 352
+        }
+      ],
+      "errors": [],
+      "scroll": {
+        "compositorFPS": 59.851071422194735,
+        "rafFPS": 60.00348472120472,
+        "duration": 4000.1000000000004,
+        "framesAbove33ms": 0,
+        "drawFrames": 239,
+        "visibleRows": 19,
+        "documentElements": 610
+      },
+      "memory": {
+        "cdp": {
+          "Documents": 1,
+          "Nodes": 2530,
+          "LayoutCount": 331,
+          "JSHeapUsedSize": 7372640,
+          "JSHeapTotalSize": 22970368
+        }
+      }
+    },
+    {
+      "label": "final-stress",
+      "environment": {
+        "date": "2026-10-13T17:01:45.794Z",
+        "cpu": "Apple M1 Pro",
+        "physicalMemory": 17179869184,
+        "browser": "156.0.8078.4",
+        "node": "v22.23.2",
+        "cpuThrottle": 4,
+        "cacheDisabled": true,
+        "networkThrottle": "none",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "repetitions": 20
+      },
+      "summary": {
+        "initial": {
+          "count": 20,
+          "median": 308.7,
+          "p95": 327.6,
+          "max": 524.1,
+          "target": 500,
+          "overTarget": 1
+        },
+        "expandCold": {
+          "count": 20,
+          "median": 44.8,
+          "p95": 46.3,
+          "max": 46.5,
+          "target": 100,
+          "overTarget": 0
+        },
+        "expandWarm": {
+          "count": 20,
+          "median": 28.6,
+          "p95": 29.7,
+          "max": 30.2,
+          "target": 100,
+          "overTarget": 0
+        },
+        "collapse": {
+          "count": 20,
+          "median": 28.200000000000003,
+          "p95": 31.2,
+          "max": 32.6,
+          "target": 100,
+          "overTarget": 0
+        },
+        "search": {
+          "count": 20,
+          "median": 49.900000000000006,
+          "p95": 52.5,
+          "max": 56.5,
+          "target": 300,
+          "overTarget": 0
+        },
+        "filter": {
+          "count": 20,
+          "median": 47.849999999999994,
+          "p95": 50.4,
+          "max": 51.8,
+          "target": 200,
+          "overTarget": 0
+        },
+        "refresh": {
+          "count": 20,
+          "median": 59.7,
+          "p95": 61.7,
+          "max": 62.4,
+          "target": 200,
+          "overTarget": 0
+        },
+        "refreshFivePages": {
+          "count": 20,
+          "median": 79.55,
+          "p95": 81.4,
+          "max": 81.7,
+          "target": 200,
+          "overTarget": 0
+        }
+      },
+      "measurements": {
+        "initial": [
+          524.1,
+          314.7,
+          327.6,
+          309.7,
+          317.3,
+          311.9,
+          304.3,
+          302.3,
+          306.6,
+          284.2,
+          288.5,
+          307.7,
+          322.8,
+          307.4,
+          314.1,
+          324.1,
+          284.8,
+          313.2,
+          285.2,
+          297.5
+        ],
+        "expandCold": [
+          41.4,
+          46.3,
+          45.5,
+          42.2,
+          42,
+          44.8,
+          45.8,
+          41.9,
+          45.3,
+          45.3,
+          45.4,
+          43.4,
+          44.6,
+          45.4,
+          46.5,
+          44.9,
+          44.8,
+          44.4,
+          44.3,
+          43.3
+        ],
+        "expandWarm": [
+          27.6,
+          30.2,
+          29.4,
+          28.6,
+          28.6,
+          29.1,
+          28,
+          27.7,
+          29.1,
+          28,
+          27.9,
+          29.7,
+          29.1,
+          28.5,
+          28.6,
+          29.7,
+          27.2,
+          26.3,
+          27.5,
+          29.6
+        ],
+        "collapse": [
+          27.6,
+          27.4,
+          28,
+          28.1,
+          29.2,
+          31.2,
+          26.8,
+          26.9,
+          28.3,
+          28.8,
+          27.2,
+          29.2,
+          28.4,
+          28.6,
+          28.5,
+          29.3,
+          27.9,
+          26.9,
+          32.6,
+          26.8
+        ],
+        "search": [
+          56.5,
+          48.5,
+          48.2,
+          50.2,
+          49.5,
+          50.8,
+          35.2,
+          48.7,
+          49.6,
+          52.5,
+          51.3,
+          50.6,
+          29.6,
+          51.8,
+          52,
+          33.8,
+          50.6,
+          49,
+          35.7,
+          50.8
+        ],
+        "filter": [
+          34.6,
+          35.1,
+          33.4,
+          48.7,
+          49,
+          31.6,
+          49.2,
+          33.5,
+          47.4,
+          49.9,
+          48.3,
+          34.1,
+          34.4,
+          34.5,
+          50.1,
+          34.7,
+          51.8,
+          48.7,
+          50.4,
+          49.2
+        ],
+        "refresh": [
+          60,
+          61.6,
+          61,
+          44.2,
+          47.6,
+          59.4,
+          46.5,
+          45.1,
+          61.2,
+          61.6,
+          60.6,
+          45.8,
+          44.3,
+          45.1,
+          62.4,
+          61.7,
+          61.1,
+          45.3,
+          45.9,
+          61.5
+        ],
+        "refreshFivePages": [
+          79.8,
+          78.6,
+          78.5,
+          79.2,
+          79.5,
+          79.3,
+          80.7,
+          80.3,
+          77.2,
+          79.6,
+          79.3,
+          76.4,
+          79.3,
+          81.7,
+          79.9,
+          80.1,
+          79.5,
+          80.1,
+          79.7,
+          81.4
+        ]
+      },
+      "initialDetails": [
+        {
+          "rootReady": 524.1000001430511,
+          "longTasks": [
+            {
+              "start": 78.70000004768372,
+              "duration": 325
+            }
+          ],
+          "resources": [
+            {
+              "name": "/assets/index-BRWcEIa5.js",
+              "duration": 6.599999904632568,
+              "start": 42.200000047683716,
+              "responseEnd": 48.799999952316284,
+              "transfer": 38253
+            },
+            {
+              "name": "/assets/index-R6h6tBbu.css",
+              "duration": 3.6000001430511475,
+              "start": 42.5,
+              "responseEnd": 46.10000014305115,
+              "transfer": 4585
+            },
+            {
+              "name": "/api/resources",
+              "duration": 5.599999904632568,
+              "start": 243.20000004768372,
+              "responseEnd": 248.79999995231628,
+              "transfer": 3125
+            },
+            {
+              "name": "/api/resources/summary",
+              "duration": 31.299999952316284,
+              "start": 246.20000004768372,
+              "responseEnd": 277.5,
+              "transfer": 359
+            },
+            {
+              "name": "/api/resources",
+              "duration": 12.400000095367432,
+              "start": 389.2000000476837,
+              "responseEnd": 401.60000014305115,
+              "transfer": 19573
+            }
+          ],
+          "domContentLoaded": 399.2000000476837
+        }
+      ],
+      "errors": [],
+      "scroll": {
+        "compositorFPS": 59.84005928923029,
+        "rafFPS": 60.00150003750094,
+        "duration": 4014.7999999523163,
+        "framesAbove33ms": 0,
+        "drawFrames": 240,
+        "visibleRows": 19,
+        "documentElements": 610
+      },
+      "memory": {
+        "cdp": {
+          "Documents": 1,
+          "Nodes": 2552,
+          "LayoutCount": 333,
+          "JSHeapUsedSize": 7361164,
+          "JSHeapTotalSize": 23494656
+        },
+        "history": [
+          {
+            "pages": 0,
+            "heapUsed": 7361164,
+            "rendererRSSKiB": 263824,
+            "rows": 20,
+            "footer": "1–500번째 · 보관 500개다음 100개"
+          },
+          {
+            "pages": 25,
+            "heapUsed": 9820964,
+            "rendererRSSKiB": 267872,
+            "rows": 14,
+            "footer": "2501–3000번째 · 보관 500개처음부터다음 100개"
+          },
+          {
+            "pages": 50,
+            "heapUsed": 9949944,
+            "rendererRSSKiB": 271712,
+            "rows": 14,
+            "footer": "5001–5500번째 · 보관 500개처음부터다음 100개"
+          },
+          {
+            "pages": 75,
+            "heapUsed": 10123644,
+            "rendererRSSKiB": 279552,
+            "rows": 14,
+            "footer": "7501–8000번째 · 보관 500개처음부터다음 100개"
+          },
+          {
+            "pages": 100,
+            "heapUsed": 9671300,
+            "rendererRSSKiB": 279152,
+            "rows": 14,
+            "footer": "10001–10500번째 · 보관 500개처음부터다음 100개"
+          }
+        ],
+        "heapAfterExplicitGC": 4646176
+      }
+    },
+    {
+      "label": "cached-formatters",
+      "environment": {
+        "date": "2026-10-13T17:07:48.984Z",
+        "cpu": "Apple M1 Pro",
+        "platform": "darwin",
+        "physicalMemory": 17179869184,
+        "browser": "156.0.8078.4",
+        "node": "v22.23.2",
+        "cpuThrottle": 4,
+        "cacheDisabled": true,
+        "networkThrottle": "none",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "repetitions": 20
+      },
+      "summary": {
+        "initial": {
+          "count": 20,
+          "median": 283.20000000000005,
+          "p95": 304.3,
+          "max": 511.6,
+          "target": 500,
+          "overTarget": 1
+        },
+        "expandCold": {
+          "count": 20,
+          "median": 44.849999999999994,
+          "p95": 46.5,
+          "max": 46.9,
+          "target": 100,
+          "overTarget": 0
+        },
+        "expandWarm": {
+          "count": 20,
+          "median": 29.15,
+          "p95": 31.1,
+          "max": 31.2,
+          "target": 100,
+          "overTarget": 0
+        },
+        "collapse": {
+          "count": 20,
+          "median": 29.15,
+          "p95": 30.2,
+          "max": 30.2,
+          "target": 100,
+          "overTarget": 0
+        },
+        "search": {
+          "count": 20,
+          "median": 52,
+          "p95": 69,
+          "max": 70,
+          "target": 300,
+          "overTarget": 0
+        },
+        "filter": {
+          "count": 20,
+          "median": 39.85,
+          "p95": 52,
+          "max": 60.2,
+          "target": 200,
+          "overTarget": 0
+        },
+        "refresh": {
+          "count": 20,
+          "median": 46.05,
+          "p95": 61.1,
+          "max": 63.3,
+          "target": 200,
+          "overTarget": 0
+        },
+        "refreshFivePages": {
+          "count": 20,
+          "median": 79.19999999999999,
+          "p95": 81.3,
+          "max": 96.4,
+          "target": 200,
+          "overTarget": 0
+        }
+      },
+      "measurements": {
+        "initial": [
+          511.6,
+          281.9,
+          287.3,
+          283.9,
+          284.2,
+          273.8,
+          265.7,
+          287.2,
+          280.3,
+          282.6,
+          291,
+          293,
+          304.3,
+          283.8,
+          281.9,
+          279.9,
+          287.3,
+          269.9,
+          281,
+          278
+        ],
+        "expandCold": [
+          42.6,
+          44.2,
+          42.2,
+          46.9,
+          42.9,
+          44.9,
+          43.7,
+          43,
+          45.6,
+          46.5,
+          45.2,
+          45.9,
+          44.8,
+          46,
+          44.3,
+          46.3,
+          45.1,
+          45,
+          44.4,
+          44.8
+        ],
+        "expandWarm": [
+          28.1,
+          30.1,
+          28.9,
+          27.2,
+          29,
+          29,
+          27.7,
+          29.3,
+          28.4,
+          29.4,
+          30.2,
+          31.1,
+          28.8,
+          31.2,
+          30.4,
+          30.1,
+          27.8,
+          29.8,
+          29,
+          29.9
+        ],
+        "collapse": [
+          27.7,
+          29.8,
+          29,
+          30,
+          30.2,
+          29.2,
+          29.7,
+          29.7,
+          28.7,
+          28.9,
+          29.5,
+          28.5,
+          28.7,
+          29.9,
+          29.1,
+          30.2,
+          29.1,
+          28.6,
+          29.1,
+          29.7
+        ],
+        "search": [
+          40.6,
+          48,
+          51.4,
+          51.1,
+          53.3,
+          69,
+          52.5,
+          52.2,
+          52,
+          51,
+          52.1,
+          50.5,
+          70,
+          67,
+          34.5,
+          51,
+          51.4,
+          66.2,
+          52,
+          52.7
+        ],
+        "filter": [
+          50,
+          35.7,
+          49.7,
+          32.5,
+          48.1,
+          29.7,
+          60.2,
+          36.5,
+          52,
+          43.2,
+          36.1,
+          32.5,
+          35,
+          35.6,
+          33.2,
+          34.3,
+          49.7,
+          49.5,
+          49.8,
+          49.8
+        ],
+        "refresh": [
+          44.7,
+          44.2,
+          44.9,
+          48,
+          45.7,
+          44.7,
+          61.1,
+          59.9,
+          45.3,
+          44.6,
+          60.7,
+          60.3,
+          44.6,
+          45.9,
+          47.3,
+          63.3,
+          46.2,
+          59.9,
+          45.1,
+          46.3
+        ],
+        "refreshFivePages": [
+          79.1,
+          79.3,
+          79.9,
+          81.2,
+          79.1,
+          78.2,
+          81,
+          79.1,
+          81.3,
+          77.9,
+          78.2,
+          79.8,
+          79.3,
+          79.6,
+          78.9,
+          78.7,
+          78.2,
+          79.5,
+          78.4,
+          96.4
+        ]
+      },
+      "initialDetails": [
+        {
+          "rootReady": 511.59999990463257,
+          "longTasks": [
+            {
+              "start": 85.09999990463257,
+              "duration": 316
+            }
+          ],
+          "resources": [
+            {
+              "name": "/assets/index-CQH3iXr8.js",
+              "duration": 5.8999998569488525,
+              "start": 39.5,
+              "responseEnd": 45.39999985694885,
+              "transfer": 38301
+            },
+            {
+              "name": "/assets/index-R6h6tBbu.css",
+              "duration": 2.799999952316284,
+              "start": 40.299999952316284,
+              "responseEnd": 43.09999990463257,
+              "transfer": 4585
+            },
+            {
+              "name": "/api/resources",
+              "duration": 7.099999904632568,
+              "start": 253.70000004768372,
+              "responseEnd": 260.7999999523163,
+              "transfer": 3134
+            },
+            {
+              "name": "/api/resources/summary",
+              "duration": 27.700000047683716,
+              "start": 255.79999995231628,
+              "responseEnd": 283.5,
+              "transfer": 359
+            },
+            {
+              "name": "/api/resources",
+              "duration": 15.900000095367432,
+              "start": 386.59999990463257,
+              "responseEnd": 402.5,
+              "transfer": 19573
+            }
+          ],
+          "domContentLoaded": 396
+        }
+      ],
+      "errors": [],
+      "scroll": {
+        "compositorFPS": 59.83140062054425,
+        "rafFPS": 60.00150003750094,
+        "duration": 4015.2999999523163,
+        "framesAbove33ms": 0,
+        "drawFrames": 240,
+        "visibleRows": 19,
+        "documentElements": 610
+      },
+      "memory": {
+        "cdp": {
+          "Documents": 1,
+          "Nodes": 2618,
+          "LayoutCount": 332,
+          "JSHeapUsedSize": 7507672,
+          "JSHeapTotalSize": 23232512
+        },
+        "history": [
+          {
+            "pages": 0,
+            "heapUsed": 7507672,
+            "rendererRSSKiB": 265376,
+            "rows": 20,
+            "footer": "1–500번째 · 보관 500개다음 100개"
+          },
+          {
+            "pages": 25,
+            "heapUsed": 9859096,
+            "rendererRSSKiB": 268848,
+            "rows": 14,
+            "footer": "2501–3000번째 · 보관 500개처음부터다음 100개"
+          },
+          {
+            "pages": 50,
+            "heapUsed": 9962000,
+            "rendererRSSKiB": 268048,
+            "rows": 14,
+            "footer": "5001–5500번째 · 보관 500개처음부터다음 100개"
+          },
+          {
+            "pages": 75,
+            "heapUsed": 9674364,
+            "rendererRSSKiB": 277216,
+            "rows": 14,
+            "footer": "7501–8000번째 · 보관 500개처음부터다음 100개"
+          },
+          {
+            "pages": 100,
+            "heapUsed": 15357256,
+            "rendererRSSKiB": 282640,
+            "rows": 14,
+            "footer": "10001–10500번째 · 보관 500개처음부터다음 100개"
+          }
+        ],
+        "heapAfterExplicitGC": 4646184
+      }
+    },
+    {
+      "label": "final-scroll-reset",
+      "environment": {
+        "date": "2026-10-13T17:09:33.508Z",
+        "cpu": "Apple M1 Pro",
+        "platform": "darwin",
+        "physicalMemory": 17179869184,
+        "browser": "156.0.8078.4",
+        "node": "v22.23.2",
+        "cpuThrottle": 4,
+        "cacheDisabled": true,
+        "networkThrottle": "none",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "repetitions": 20
+      },
+      "summary": {
+        "initial": {
+          "count": 20,
+          "median": 278.8,
+          "p95": 303.9,
+          "max": 453.8,
+          "target": 500,
+          "overTarget": 0
+        },
+        "expandCold": {
+          "count": 20,
+          "median": 45.1,
+          "p95": 46.2,
+          "max": 47.1,
+          "target": 100,
+          "overTarget": 0
+        },
+        "expandWarm": {
+          "count": 20,
+          "median": 29.1,
+          "p95": 30.7,
+          "max": 31.6,
+          "target": 100,
+          "overTarget": 0
+        },
+        "collapse": {
+          "count": 20,
+          "median": 29,
+          "p95": 30.9,
+          "max": 32.2,
+          "target": 100,
+          "overTarget": 0
+        },
+        "search": {
+          "count": 20,
+          "median": 103.35,
+          "p95": 120.4,
+          "max": 125.3,
+          "target": 300,
+          "overTarget": 0
+        },
+        "filter": {
+          "count": 20,
+          "median": 34.35,
+          "p95": 49.4,
+          "max": 50.3,
+          "target": 200,
+          "overTarget": 0
+        },
+        "refresh": {
+          "count": 20,
+          "median": 45.4,
+          "p95": 60.2,
+          "max": 60.4,
+          "target": 200,
+          "overTarget": 0
+        },
+        "refreshFivePages": {
+          "count": 20,
+          "median": 79.65,
+          "p95": 80.4,
+          "max": 95.4,
+          "target": 200,
+          "overTarget": 0
+        }
+      },
+      "measurements": {
+        "initial": [
+          453.8,
+          280.1,
+          269.8,
+          280.7,
+          264.8,
+          276.7,
+          279.8,
+          275.6,
+          286.2,
+          285.2,
+          268.7,
+          287.2,
+          283.9,
+          276.3,
+          277.8,
+          256.8,
+          303.9,
+          262.5,
+          282.6,
+          275.7
+        ],
+        "expandCold": [
+          46.1,
+          44.3,
+          43.1,
+          44.6,
+          44.4,
+          44.2,
+          45.7,
+          46.2,
+          44.5,
+          45.5,
+          44.1,
+          45.4,
+          45.3,
+          45.1,
+          47.1,
+          45.1,
+          46,
+          43.4,
+          45.6,
+          43.8
+        ],
+        "expandWarm": [
+          28.2,
+          29.2,
+          30.6,
+          28.6,
+          29.2,
+          28.2,
+          31.6,
+          29.8,
+          30,
+          30.3,
+          28.6,
+          28.5,
+          27.9,
+          27.8,
+          29.7,
+          30.1,
+          23.2,
+          29,
+          28.8,
+          30.7
+        ],
+        "collapse": [
+          30.2,
+          28.8,
+          30.9,
+          28.1,
+          29,
+          28.6,
+          30.8,
+          32.2,
+          29,
+          29.9,
+          26.7,
+          28.1,
+          28.9,
+          29.5,
+          30.8,
+          28.9,
+          24.8,
+          26.4,
+          30.1,
+          29.5
+        ],
+        "search": [
+          125.3,
+          50.6,
+          33.7,
+          66.6,
+          118.1,
+          101,
+          103.5,
+          116.6,
+          118.2,
+          117.8,
+          118.2,
+          100.1,
+          101.1,
+          103.2,
+          117.6,
+          97.2,
+          95.9,
+          120.4,
+          114.9,
+          51
+        ],
+        "filter": [
+          35.6,
+          32.8,
+          33.3,
+          49.4,
+          34.1,
+          34.5,
+          34.6,
+          32.4,
+          35.1,
+          34.7,
+          35.5,
+          34.2,
+          36.4,
+          33.3,
+          34.9,
+          32.7,
+          33.7,
+          34,
+          31.8,
+          50.3
+        ],
+        "refresh": [
+          60.2,
+          46.1,
+          44.8,
+          43.4,
+          60.4,
+          59.7,
+          44,
+          42.3,
+          45.2,
+          45.8,
+          45.4,
+          45.4,
+          45.1,
+          44.2,
+          46.9,
+          46.7,
+          45.6,
+          44.4,
+          44.6,
+          45.7
+        ],
+        "refreshFivePages": [
+          77.2,
+          79.7,
+          79.3,
+          79.7,
+          78,
+          79.6,
+          79.8,
+          78,
+          80.2,
+          79.9,
+          79.9,
+          95.4,
+          80,
+          78.4,
+          79.5,
+          80.3,
+          80.4,
+          79.5,
+          79.2,
+          78.8
+        ]
+      },
+      "initialDetails": [
+        {
+          "rootReady": 453.7999999523163,
+          "longTasks": [
+            {
+              "start": 60.799999952316284,
+              "duration": 282
+            }
+          ],
+          "resources": [
+            {
+              "name": "/assets/index-zSi17Nag.js",
+              "duration": 6.400000095367432,
+              "start": 28.799999952316284,
+              "responseEnd": 35.200000047683716,
+              "transfer": 38323
+            },
+            {
+              "name": "/assets/index-R6h6tBbu.css",
+              "duration": 2.6999998092651367,
+              "start": 30.200000047683716,
+              "responseEnd": 32.89999985694885,
+              "transfer": 4585
+            },
+            {
+              "name": "/api/resources",
+              "duration": 7.5,
+              "start": 211.09999990463257,
+              "responseEnd": 218.59999990463257,
+              "transfer": 3143
+            },
+            {
+              "name": "/api/resources/summary",
+              "duration": 20.700000047683716,
+              "start": 213.5,
+              "responseEnd": 234.20000004768372,
+              "transfer": 359
+            },
+            {
+              "name": "/api/resources",
+              "duration": 17.200000047683716,
+              "start": 215.39999985694885,
+              "responseEnd": 232.59999990463257,
+              "transfer": 19573
+            }
+          ],
+          "domContentLoaded": 224.09999990463257
+        }
+      ],
+      "errors": [],
+      "scroll": {
+        "compositorFPS": 59.85113345275179,
+        "rafFPS": 60.004470333039826,
+        "duration": 4015.300000095367,
+        "framesAbove33ms": 0,
+        "drawFrames": 240,
+        "visibleRows": 19,
+        "documentElements": 610
+      },
+      "memory": {
+        "cdp": {
+          "Documents": 1,
+          "Nodes": 2662,
+          "LayoutCount": 330,
+          "JSHeapUsedSize": 7596172,
+          "JSHeapTotalSize": 23494656
+        },
+        "history": [
+          {
+            "pages": 0,
+            "heapUsed": 7596172,
+            "rendererRSSKiB": 291120,
+            "rows": 20,
+            "footer": "1–500번째 · 보관 500개다음 100개"
+          },
+          {
+            "pages": 25,
+            "heapUsed": 9886692,
+            "rendererRSSKiB": 294048,
+            "rows": 14,
+            "footer": "2501–3000번째 · 보관 500개처음부터다음 100개"
+          },
+          {
+            "pages": 50,
+            "heapUsed": 9988792,
+            "rendererRSSKiB": 276464,
+            "rows": 14,
+            "footer": "5001–5500번째 · 보관 500개처음부터다음 100개"
+          },
+          {
+            "pages": 75,
+            "heapUsed": 10148960,
+            "rendererRSSKiB": 280368,
+            "rows": 14,
+            "footer": "7501–8000번째 · 보관 500개처음부터다음 100개"
+          },
+          {
+            "pages": 100,
+            "heapUsed": 13868280,
+            "rendererRSSKiB": 287376,
+            "rows": 14,
+            "footer": "10001–10500번째 · 보관 500개처음부터다음 100개"
+          }
+        ],
+        "heapAfterExplicitGC": 4650080
+      }
+    },
+    {
+      "label": "verification-scroll-reset",
+      "environment": {
+        "date": "2026-10-13T17:11:10.914Z",
+        "cpu": "Apple M1 Pro",
+        "platform": "darwin",
+        "physicalMemory": 17179869184,
+        "browser": "156.0.8078.4",
+        "node": "v22.23.2",
+        "cpuThrottle": 4,
+        "cacheDisabled": true,
+        "networkThrottle": "none",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "repetitions": 20
+      },
+      "summary": {
+        "initial": {
+          "count": 20,
+          "median": 277.6,
+          "p95": 301.3,
+          "max": 468.9,
+          "target": 500,
+          "overTarget": 0
+        },
+        "expandCold": {
+          "count": 20,
+          "median": 44.849999999999994,
+          "p95": 45.9,
+          "max": 45.9,
+          "target": 100,
+          "overTarget": 0
+        },
+        "expandWarm": {
+          "count": 20,
+          "median": 29.4,
+          "p95": 30.9,
+          "max": 31.1,
+          "target": 100,
+          "overTarget": 0
+        },
+        "collapse": {
+          "count": 20,
+          "median": 29.1,
+          "p95": 29.8,
+          "max": 32.3,
+          "target": 100,
+          "overTarget": 0
+        },
+        "search": {
+          "count": 20,
+          "median": 116.75,
+          "p95": 119.9,
+          "max": 120.1,
+          "target": 300,
+          "overTarget": 0
+        },
+        "filter": {
+          "count": 20,
+          "median": 34.2,
+          "p95": 37.2,
+          "max": 44.7,
+          "target": 200,
+          "overTarget": 0
+        },
+        "refresh": {
+          "count": 20,
+          "median": 45.25,
+          "p95": 47.5,
+          "max": 60.4,
+          "target": 200,
+          "overTarget": 0
+        },
+        "refreshFivePages": {
+          "count": 20,
+          "median": 79.35,
+          "p95": 96.3,
+          "max": 97.3,
+          "target": 200,
+          "overTarget": 0
+        }
+      },
+      "measurements": {
+        "initial": [
+          468.9,
+          280.5,
+          278.6,
+          256.4,
+          268.4,
+          277.6,
+          276.4,
+          279.6,
+          276.5,
+          269.4,
+          278.5,
+          274,
+          285.2,
+          291.8,
+          277.6,
+          277.8,
+          262.6,
+          301.3,
+          257.5,
+          265
+        ],
+        "expandCold": [
+          44.9,
+          43.5,
+          45.3,
+          45.9,
+          45.5,
+          45.9,
+          43.7,
+          44,
+          43.2,
+          44.7,
+          43.6,
+          45.1,
+          45.1,
+          45.4,
+          45.9,
+          44.1,
+          45.1,
+          44.5,
+          44.6,
+          44.8
+        ],
+        "expandWarm": [
+          30.6,
+          26.3,
+          27.6,
+          28.3,
+          29.2,
+          29.4,
+          29.8,
+          29.1,
+          28.7,
+          31.1,
+          29.4,
+          30.9,
+          29.7,
+          29.3,
+          28.9,
+          29.7,
+          30.5,
+          28.1,
+          29.7,
+          29.4
+        ],
+        "collapse": [
+          29.4,
+          29.6,
+          28.5,
+          32.3,
+          28.7,
+          29.4,
+          28.9,
+          29.5,
+          28.7,
+          29.7,
+          28.4,
+          29,
+          28.4,
+          28.7,
+          29.2,
+          29.2,
+          29.8,
+          28.7,
+          28.6,
+          29.4
+        ],
+        "search": [
+          106.8,
+          117.1,
+          101.7,
+          116.4,
+          100.6,
+          118.2,
+          103.2,
+          117.8,
+          119.2,
+          118.3,
+          69.7,
+          117.9,
+          117.6,
+          119.9,
+          117.4,
+          103.5,
+          101.3,
+          99.3,
+          120.1,
+          52.3
+        ],
+        "filter": [
+          32.3,
+          32.6,
+          33.6,
+          35.3,
+          34.7,
+          33.9,
+          32.2,
+          35.4,
+          34.1,
+          35.4,
+          44.7,
+          34.7,
+          32.4,
+          37.2,
+          34.2,
+          34.9,
+          34.2,
+          31.6,
+          35.3,
+          34.2
+        ],
+        "refresh": [
+          46,
+          44.5,
+          47.5,
+          44.1,
+          44.8,
+          45.5,
+          46.3,
+          44.9,
+          44.5,
+          60.4,
+          45.9,
+          45.2,
+          45.4,
+          45.1,
+          44.7,
+          46.3,
+          45,
+          45.3,
+          44.2,
+          45.8
+        ],
+        "refreshFivePages": [
+          78.9,
+          79.6,
+          79.1,
+          78.5,
+          97.3,
+          80,
+          96.3,
+          78.2,
+          78.8,
+          79.2,
+          80.8,
+          79.4,
+          80.3,
+          79.6,
+          78.5,
+          79.3,
+          96.3,
+          80,
+          78.9,
+          79.3
+        ]
+      },
+      "initialDetails": [
+        {
+          "rootReady": 468.90000009536743,
+          "longTasks": [
+            {
+              "start": 73.20000004768372,
+              "duration": 287
+            }
+          ],
+          "resources": [
+            {
+              "name": "/assets/index-zSi17Nag.js",
+              "duration": 6.299999952316284,
+              "start": 36,
+              "responseEnd": 42.299999952316284,
+              "transfer": 38323
+            },
+            {
+              "name": "/assets/index-R6h6tBbu.css",
+              "duration": 3.200000047683716,
+              "start": 36.59999990463257,
+              "responseEnd": 39.799999952316284,
+              "transfer": 4585
+            },
+            {
+              "name": "/api/resources",
+              "duration": 9.800000190734863,
+              "start": 230.59999990463257,
+              "responseEnd": 240.40000009536743,
+              "transfer": 3132
+            },
+            {
+              "name": "/api/resources/summary",
+              "duration": 23.200000047683716,
+              "start": 233.5,
+              "responseEnd": 256.7000000476837,
+              "transfer": 359
+            },
+            {
+              "name": "/api/resources",
+              "duration": 13.700000047683716,
+              "start": 236.09999990463257,
+              "responseEnd": 249.79999995231628,
+              "transfer": 19573
+            }
+          ],
+          "domContentLoaded": 244.90000009536743
+        }
+      ],
+      "errors": [],
+      "scroll": {
+        "compositorFPS": 59.84627769924867,
+        "rafFPS": 60.004500337525315,
+        "duration": 4012.999999904632,
+        "framesAbove33ms": 0,
+        "drawFrames": 240,
+        "visibleRows": 19,
+        "documentElements": 610
+      },
+      "memory": {
+        "cdp": {
+          "Documents": 1,
+          "Nodes": 2574,
+          "LayoutCount": 331,
+          "JSHeapUsedSize": 7452696,
+          "JSHeapTotalSize": 22708224
+        },
+        "history": [
+          {
+            "pages": 0,
+            "heapUsed": 7452696,
+            "rendererRSSKiB": 269488,
+            "rows": 20,
+            "footer": "1–500번째 · 보관 500개다음 100개"
+          },
+          {
+            "pages": 25,
+            "heapUsed": 9808760,
+            "rendererRSSKiB": 267120,
+            "rows": 14,
+            "footer": "2501–3000번째 · 보관 500개처음부터다음 100개"
+          },
+          {
+            "pages": 50,
+            "heapUsed": 9949724,
+            "rendererRSSKiB": 266224,
+            "rows": 14,
+            "footer": "5001–5500번째 · 보관 500개처음부터다음 100개"
+          },
+          {
+            "pages": 75,
+            "heapUsed": 10156280,
+            "rendererRSSKiB": 274544,
+            "rows": 14,
+            "footer": "7501–8000번째 · 보관 500개처음부터다음 100개"
+          },
+          {
+            "pages": 100,
+            "heapUsed": 15446424,
+            "rendererRSSKiB": 281440,
+            "rows": 14,
+            "footer": "10001–10500번째 · 보관 500개처음부터다음 100개"
+          }
+        ],
+        "heapAfterExplicitGC": 4648288
+      }
+    }
+  ]
+}
