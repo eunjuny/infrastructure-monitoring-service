@@ -21,3 +21,5 @@ management:
         include: health
 monitoring:
   query-timeout-seconds: 3
+  mock:
+    enabled: false

@@ -1,0 +1,6 @@
+# Changes the isolated assignment DB. Do not use this profile against real infrastructure data.
+monitoring:
+  mock:
+    enabled: ${MOCK_UPDATES_ENABLED:true}
+    interval-ms: ${MOCK_UPDATE_INTERVAL_MS:5000}
+    initial-delay-ms: 10000
