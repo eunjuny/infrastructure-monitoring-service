@@ -1,6 +1,6 @@
 # 성능 검증과 필수 개선 결과
 
-기준일: 2026-10-14. Infrastructure Monitoring Service만 대상으로 작업했습니다. 기존 Auknowlog의 소스·DB·의존성은 변경하지 않았습니다. 커밋·푸시는 하지 않았습니다.
+기준일: 2026-10-14. Infrastructure Monitoring Service만 대상으로 작업했습니다. 기존 Auknowlog의 소스·DB·의존성은 변경하지 않았습니다. 이 보고서는 성능 개선 당시 측정이며 이후 변경사항을 단계별 로컬 커밋으로 정리했습니다. 푸시는 하지 않았습니다.
 
 ## 결론
 
@@ -115,7 +115,7 @@ RSS는 renderer 프로세스의 물리 메모리, JS heap은 JS 객체 영역입
 - `npm run build`: 타입 검사·프로덕션 빌드 통과.
 - `npm run test:e2e`: 실제 PostgreSQL·API Chromium 7개 통과. 탐색·검색·필터·캐시·자동 반영·선택·스크롤 유지·콘솔 조작·모바일 레이아웃을 재확인했습니다.
 - `npm audit --audit-level=moderate`: 0건.
-- 백엔드 소스·API·스키마는 이번 개선에서 변경하지 않았습니다. 앞서 전체 69개, 실제 PostgreSQL 통합 17개를 통과한 상태이며 이번에 백엔드 전체 테스트를 다시 실행한 것은 아닙니다.
+- 백엔드 소스·API·스키마는 성능 개선에서 변경하지 않았습니다. 이후 단계별 커밋 전 점검에서 전체 69개(실제 PostgreSQL 통합 17개 포함)를 다시 실행했고 실패·오류·skip 없이 통과했습니다. 프론트 56개·Chromium 7개·빌드·npm audit도 커밋 직전에 재검증했습니다.
 
 ## 남은 제출 전 점검
 
