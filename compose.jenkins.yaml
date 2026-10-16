@@ -1,0 +1,29 @@
+name: infrastructure-monitoring-jenkins
+services:
+  secret-init:
+    image: alpine:3.22
+    secrets:
+      - jenkins_admin_password
+    volumes:
+      - jenkins-credentials:/credentials
+    command: ["sh", "-c", "cp /run/secrets/jenkins_admin_password /credentials/password && chown 1000:1000 /credentials/password && chmod 600 /credentials/password"]
+  jenkins:
+    build:
+      context: .
+      dockerfile: infra/jenkins/Dockerfile
+    environment:
+      JAVA_OPTS: -Xmx512m -Djenkins.install.runSetupWizard=false
+    ports:
+      - "127.0.0.1:8182:8080"
+    volumes:
+      - jenkins-home:/var/jenkins_home
+      - jenkins-credentials:/run/ci-secrets:ro
+    depends_on:
+      secret-init:
+        condition: service_completed_successfully
+secrets:
+  jenkins_admin_password:
+    file: .local/jenkins-admin-password
+volumes:
+  jenkins-home:
+  jenkins-credentials:

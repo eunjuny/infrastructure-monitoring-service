@@ -1,0 +1,16 @@
+# Compose >= 2.24.4. Fresh CI databases; never reset a developer's persistent volumes.
+services:
+  backend:
+    image: ${CI_BACKEND_IMAGE:-infrastructure-monitoring-ci-auth-backend}
+  frontend:
+    image: ${CI_AUTH_FRONTEND_IMAGE:-infrastructure-monitoring-ci-auth-frontend}
+  alert-receiver:
+    image: ${CI_RECEIVER_IMAGE:-infrastructure-monitoring-ci-auth-alert-receiver}
+  db:
+    volumes: !override
+      - type: tmpfs
+        target: /var/lib/postgresql/data
+  keycloak-db:
+    volumes: !override
+      - type: tmpfs
+        target: /var/lib/postgresql/data

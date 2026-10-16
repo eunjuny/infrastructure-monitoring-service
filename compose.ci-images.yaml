@@ -1,0 +1,19 @@
+services:
+  backend:
+    image: ${CI_BACKEND_IMAGE:?Run the CI prepare stage}
+    build:
+      args:
+        SOURCE_REVISION: ${CI_COMMIT_SHA:?Commit SHA is required}
+        BUILD_ID: ${CI_BUILD_ID:?Build ID is required}
+  frontend:
+    image: ${CI_FRONTEND_IMAGE:?Run the CI prepare stage}
+    build:
+      args:
+        SOURCE_REVISION: ${CI_COMMIT_SHA:?Commit SHA is required}
+        BUILD_ID: ${CI_BUILD_ID:?Build ID is required}
+  alert-receiver:
+    image: ${CI_RECEIVER_IMAGE:?Run the CI prepare stage}
+    build:
+      args:
+        SOURCE_REVISION: ${CI_COMMIT_SHA:?Commit SHA is required}
+        BUILD_ID: ${CI_BUILD_ID:?Build ID is required}
