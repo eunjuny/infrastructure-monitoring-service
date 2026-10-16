@@ -47,6 +47,32 @@ class ResourceApiIntegrationTest {
         }
     }
 
+    @Test void scopesDescendantsByClusterAndNamespace() throws Exception {
+        mvc.perform(get("/api/resources").param("type","POD").param("clusterId","2").param("limit","100"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].id").value(5001));
+        mvc.perform(get("/api/resources").param("type","POD").param("clusterId","2").param("namespaceId","101"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(50)).andExpect(jsonPath("$.items[0].parent.id").value(101));
+        mvc.perform(get("/api/resources/search").param("q","worker").param("clusterId","2").param("namespaceId","101").param("status","NORMAL"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].resource.id").value(5001)).andExpect(jsonPath("$.items[0].path[0].id").value(2));
+    }
+
+    @Test void rejectsConflictingUnknownAndIllegalScope() throws Exception {
+        mvc.perform(get("/api/resources").param("type","POD").param("clusterId","1").param("namespaceId","101")).andExpect(status().isBadRequest());
+        mvc.perform(get("/api/resources").param("type","NODE").param("namespaceId","1")).andExpect(status().isBadRequest());
+        mvc.perform(get("/api/resources").param("type","POD").param("clusterId","999")).andExpect(status().isNotFound());
+        mvc.perform(get("/api/resources").param("type","POD").param("parentId","1").param("namespaceId","101")).andExpect(status().isBadRequest());
+    }
+
+    @Test void cursorIsBoundToAncestorScopes() throws Exception {
+        var first=mapper.readTree(mvc.perform(get("/api/resources").param("type","POD").param("clusterId","2").param("limit","20"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        var cursor=first.path("nextCursor").asText();
+        mvc.perform(get("/api/resources").param("type","POD").param("clusterId","2").param("limit","20").param("cursor",cursor))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].id").value(5021));
+        mvc.perform(get("/api/resources").param("type","POD").param("clusterId","3").param("cursor",cursor)).andExpect(status().isBadRequest());
+        mvc.perform(get("/api/resources").param("type","POD").param("cursor",cursor)).andExpect(status().isBadRequest());
+    }
+
     @Test void initialClustersHaveRequiredFieldsAndChildren() throws Exception {
         mvc.perform(get("/api/resources"))
                 .andExpect(status().isOk())

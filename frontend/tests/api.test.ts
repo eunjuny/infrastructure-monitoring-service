@@ -32,7 +32,7 @@ describe('API request contract', () => {
     await api.summary(); await api.detail(resource(25))
     expect(fetch.mock.calls.map(call => call[0])).toEqual(['/api/resources/summary', '/api/resources/POD/25'])
   })
-  it.each([400, 404, 503])('maps HTTP %i without leaking response bodies', async status => {
+  it.each([400, 401, 403, 404, 503])('maps HTTP %i without leaking response bodies', async status => {
     mock({ detail: 'internal SQL secret' }, status)
     await expect(api.summary()).rejects.toBeInstanceOf(ApiError)
     await expect(api.summary()).rejects.not.toThrow('internal SQL secret')

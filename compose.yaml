@@ -15,5 +15,35 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+  prometheus:
+    image: prom/prometheus:v3.13.1
+    profiles: [monitoring]
+    ports:
+      - "127.0.0.1:9094:9090"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./infra/prometheus/development.yaml:/etc/prometheus/prometheus.yml:ro
+      - ./infra/prometheus/alerts.yaml:/etc/prometheus/alerts.yaml:ro
+      - development-prometheus:/prometheus
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.retention.time=7d", "--storage.tsdb.retention.size=256MB"]
+  alertmanager:
+    image: prom/alertmanager:v0.34.0
+    profiles: [monitoring]
+    ports: ['127.0.0.1:9194:9093']
+    volumes:
+      - ./infra/alertmanager/alertmanager.yaml:/etc/alertmanager/alertmanager.yml:ro
+      - development-alertmanager:/alertmanager
+    command: ['--config.file=/etc/alertmanager/alertmanager.yml', '--storage.path=/alertmanager', '--data.retention=24h', '--cluster.listen-address=']
+    depends_on: [alert-receiver]
+  alert-receiver:
+    profiles: [monitoring]
+    build: {context: ., dockerfile: infra/alertmanager/Dockerfile}
+    mem_limit: 64m
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
 volumes:
   monitoring-db:
+  development-prometheus:
+  development-alertmanager:

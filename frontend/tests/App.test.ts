@@ -1,9 +1,10 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { mount, flushPromises, type VueWrapper } from '@vue/test-utils'
 import App from '../src/App.vue'
 import { api, ApiError, type Detail } from '../src/api'
 import { deferred, page, resource } from './fixtures'
 let wrapper: VueWrapper | undefined
+beforeAll(async () => { await import('../src/components/ResourceDetail.vue') })
 afterEach(() => { wrapper?.unmount(); wrapper = undefined })
 function setup() {
   const cluster = resource(1, 'CLUSTER'), node = resource(1, 'NODE'), namespace = resource(1, 'NAMESPACE'), pod = resource(1)
@@ -32,11 +33,14 @@ describe('screen to API connection', () => {
     expect(wrapper!.findAll('.resource-row .parent-cell')).toHaveLength(1)
     expect(wrapper!.find('.resource-row time').attributes('datetime')).toBe('2026-10-13T00:00:00Z')
   })
-  it('reuses date formatters instead of creating locale formatting work for every row', async () => {
+  it('uses fixed local timestamps without initializing locale formatters in the first screen', async () => {
     const localeFormat = vi.spyOn(Date.prototype, 'toLocaleString')
+    const formatter = vi.spyOn(Intl, 'DateTimeFormat')
+    const numberLocale = vi.spyOn(Number.prototype, 'toLocaleString')
     setup(); await flushPromises()
-    const expected = new Intl.DateTimeFormat('ko-KR', { year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric' }).format(new Date('2026-10-13T00:00:00Z'))
-    expect(wrapper!.find('.resource-row time').attributes('title')).toBe(expected)
+    expect(wrapper!.find('.resource-row time').attributes('title')).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:00$/)
+    expect(formatter).not.toHaveBeenCalled()
+    expect(numberLocale).not.toHaveBeenCalled()
     expect(localeFormat).not.toHaveBeenCalled()
     await wrapper!.find('button[aria-label="Node 전체 목록 보기"]').trigger('click'); await flushPromises()
     expect(localeFormat).not.toHaveBeenCalled()
@@ -45,6 +49,7 @@ describe('screen to API connection', () => {
     const { detail } = setup(); await flushPromises()
     const pending = deferred<Detail>(); detail.mockReturnValueOnce(pending.promise)
     await wrapper!.find('.resource-row').trigger('click')
+    await flushPromises()
     await wrapper!.find('button[aria-label="상세 닫기"]').trigger('click')
     pending.resolve({ resource: resource(), path: [], attributes: {} }); await flushPromises()
     expect(wrapper!.find('.detail-panel').exists()).toBe(false)
@@ -133,8 +138,8 @@ describe('screen to API connection', () => {
   it('supports global search across types and status filters', async () => {
     const { list } = setup(); await flushPromises()
     await wrapper!.find('.filters input').setValue('pod')
-    await wrapper!.findAll('select')[0]!.setValue('')
-    await wrapper!.findAll('select')[1]!.setValue('ERROR'); await flushPromises()
+    await wrapper!.findAll('.filters select')[0]!.setValue('')
+    await wrapper!.findAll('.filters select')[1]!.setValue('ERROR'); await flushPromises()
     expect(list.mock.calls.at(-1)![0]).toEqual({ type: '', parentId: undefined, status: 'ERROR', q: 'pod' })
     await wrapper!.find('.filters input').setValue(''); await wrapper!.find('form').trigger('submit'); await flushPromises()
     expect(list.mock.calls.at(-1)![0].type).toBe('POD')

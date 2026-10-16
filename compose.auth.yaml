@@ -1,0 +1,118 @@
+name: infrastructure-monitoring-auth
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: monitoring
+      POSTGRES_USER: monitoring
+      POSTGRES_PASSWORD: ${AUTH_APP_DB_PASSWORD:?Run scripts/auth-local.py first}
+    volumes: [auth-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U monitoring -d monitoring']
+      interval: 5s
+      timeout: 3s
+      retries: 30
+  keycloak-db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: identity
+      POSTGRES_USER: identity
+      POSTGRES_PASSWORD: ${AUTH_IDENTITY_DB_PASSWORD:?Run scripts/auth-local.py first}
+    volumes: [identity-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U identity -d identity']
+      interval: 5s
+      timeout: 3s
+      retries: 30
+  auth-import:
+    image: alpine:3.22
+    user: '0:0'
+    volumes:
+      - ${AUTH_REALM_FILE:-./.local/auth/realm.json}:/source/realm.json:ro
+      - realm-import:/import
+    command: [sh, -c, 'cp /source/realm.json /import/infrastructure-monitoring-realm.json && chown 1000:0 /import/infrastructure-monitoring-realm.json && chmod 600 /import/infrastructure-monitoring-realm.json']
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.1
+    command: [start-dev, --import-realm, '--hostname=http://127.0.0.1:${AUTH_KEYCLOAK_PORT:-8183}']
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-db:5432/identity
+      KC_DB_USERNAME: identity
+      KC_DB_PASSWORD: ${AUTH_IDENTITY_DB_PASSWORD:?Run scripts/auth-local.py first}
+      KC_BOOTSTRAP_ADMIN_USERNAME: kc-bootstrap
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${AUTH_BOOTSTRAP_PASSWORD:?Run scripts/auth-local.py first}
+      KC_HEALTH_ENABLED: 'true'
+    ports: ['127.0.0.1:${AUTH_KEYCLOAK_PORT:-8183}:8080']
+    volumes: [realm-import:/opt/keycloak/data/import:ro]
+    depends_on:
+      keycloak-db: {condition: service_healthy}
+      auth-import: {condition: service_completed_successfully}
+  backend:
+    build: {context: ., dockerfile: backend/Dockerfile}
+    environment:
+      DATABASE_URL: jdbc:postgresql://db:5432/monitoring
+      DATABASE_USER: monitoring
+      DATABASE_PASSWORD: ${AUTH_APP_DB_PASSWORD:?Run scripts/auth-local.py first}
+      SERVER_ADDRESS: 0.0.0.0
+      MANAGEMENT_ADDRESS: 0.0.0.0
+      PROMETHEUS_URL: http://prometheus:9090
+      MONITORING_AUTH_ENABLED: 'true'
+      SPRING_PROFILES_ACTIVE: mock
+      MONITORING_AUTH_ISSUER: http://127.0.0.1:${AUTH_KEYCLOAK_PORT:-8183}/realms/infrastructure-monitoring
+      MONITORING_AUTH_JWK_SET_URI: http://keycloak:8080/realms/infrastructure-monitoring/protocol/openid-connect/certs
+    ports: ['127.0.0.1:${AUTH_API_PORT:-8083}:8081']
+    depends_on:
+      db: {condition: service_healthy}
+      keycloak: {condition: service_started}
+    healthcheck:
+      test: [CMD, curl, --fail, --silent, 'http://localhost:8086/actuator/health']
+      interval: 5s
+      timeout: 3s
+      retries: 40
+      start_period: 20s
+  seed:
+    image: postgres:17-alpine
+    environment:
+      PGPASSWORD: ${AUTH_APP_DB_PASSWORD:?Run scripts/auth-local.py first}
+    volumes: ['./scripts/seed.sql:/seed.sql:ro']
+    command: [psql, -h, db, -U, monitoring, -d, monitoring, -v, ON_ERROR_STOP=1, -f, /seed.sql]
+    depends_on:
+      backend: {condition: service_healthy}
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args: {VITE_AUTH_ENABLED: 'true'}
+    ports: ['127.0.0.1:${AUTH_WEB_PORT:-5176}:8080']
+    depends_on:
+      seed: {condition: service_completed_successfully}
+  prometheus:
+    image: prom/prometheus:v3.13.1
+    ports: ['127.0.0.1:${AUTH_PROMETHEUS_PORT:-9095}:9090']
+    volumes:
+      - ./infra/prometheus/auth.yaml:/etc/prometheus/prometheus.yml:ro
+      - ./infra/prometheus/alerts.yaml:/etc/prometheus/alerts.yaml:ro
+      - auth-prometheus:/prometheus
+    command: ['--config.file=/etc/prometheus/prometheus.yml', '--storage.tsdb.retention.time=7d', '--storage.tsdb.retention.size=256MB']
+    depends_on:
+      backend: {condition: service_healthy}
+  alertmanager:
+    image: prom/alertmanager:v0.34.0
+    ports: ['127.0.0.1:${AUTH_ALERTMANAGER_PORT:-9195}:9093']
+    volumes:
+      - ./infra/alertmanager/alertmanager.yaml:/etc/alertmanager/alertmanager.yml:ro
+      - auth-alertmanager:/alertmanager
+    command: ['--config.file=/etc/alertmanager/alertmanager.yml', '--storage.path=/alertmanager', '--data.retention=24h', '--cluster.listen-address=']
+    depends_on: [alert-receiver]
+  alert-receiver:
+    build: {context: ., dockerfile: infra/alertmanager/Dockerfile}
+    mem_limit: 64m
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+volumes:
+  auth-data:
+  identity-data:
+  realm-import:
+  auth-prometheus:
+  auth-alertmanager:

@@ -1,0 +1,34 @@
+groups:
+  - name: infrastructure-service
+    interval: 15s
+    rules:
+      - alert: BackendScrapeUnavailable
+        expr: (up{job="infrastructure-api"} == 0) or absent(up{job="infrastructure-api"})
+        for: 1m
+        labels:
+          severity: critical
+          job: infrastructure-api
+        annotations:
+          summary: Backend metrics are unavailable
+          runbook: docs/ALERTING_AND_RECOVERY.md#backend
+      - alert: ResourceApiErrorBurst
+        expr: |
+          (sum(increase(http_server_requests_seconds_count{job="infrastructure-api",uri=~"/api/resources.*",status=~"5.."}[5m]))
+            / sum(increase(http_server_requests_seconds_count{job="infrastructure-api",uri=~"/api/resources.*"}[5m])) > 0.10)
+          and (sum(increase(http_server_requests_seconds_count{job="infrastructure-api",uri=~"/api/resources.*"}[5m])) >= 20)
+        for: 1m
+        labels:
+          severity: warning
+          job: infrastructure-api
+        annotations:
+          summary: Resource API server errors are sustained
+          runbook: docs/ALERTING_AND_RECOVERY.md#api-errors
+      - alert: MockBatchFailures
+        expr: sum(increase(infrastructure_mock_failures_total{job="infrastructure-api"}[5m])) >= 3
+        for: 1m
+        labels:
+          severity: warning
+          job: infrastructure-api
+        annotations:
+          summary: Mock resource update batches repeatedly failed
+          runbook: docs/ALERTING_AND_RECOVERY.md#mock

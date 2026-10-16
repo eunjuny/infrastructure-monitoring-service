@@ -1,5 +1,5 @@
 server:
-  address: 127.0.0.1
+  address: ${SERVER_ADDRESS:127.0.0.1}
   port: 8081
 spring:
   application:
@@ -8,18 +8,39 @@ spring:
     url: ${DATABASE_URL:jdbc:postgresql://127.0.0.1:5544/monitoring}
     username: ${DATABASE_USER:monitoring}
     password: ${DATABASE_PASSWORD:local-monitoring-only}
+    hikari:
+      connection-timeout: 3000
+      validation-timeout: 1000
+  flyway:
+    enabled: true
   jpa:
     open-in-view: false
     hibernate:
       ddl-auto: validate
-  flyway:
-    enabled: true
+    properties:
+      hibernate:
+        query:
+          fail_on_pagination_over_collection_fetch: true
 management:
+  server:
+    address: ${MANAGEMENT_ADDRESS:127.0.0.1}
+    port: ${MANAGEMENT_PORT:8086}
   endpoints:
     web:
       exposure:
-        include: health
+        include: health,prometheus
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+        infrastructure.query: true
+        infrastructure.mock.batch: true
 monitoring:
   query-timeout-seconds: 3
+  prometheus-url: ${PROMETHEUS_URL:http://127.0.0.1:9094}
+  history:
+    max-events: 20000
+    retention-hours: 24
+    cleanup-batch: 5000
   mock:
     enabled: false

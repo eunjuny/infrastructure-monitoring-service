@@ -1,10 +1,14 @@
 package dev.infrastructure.monitoring.resource;
 
 public record ResourceQuery(ResourceType type, Long parentId, String query,
-                            ResourceStatus status, int limit, String cursor) {
+                            ResourceStatus status, int limit, String cursor, Long clusterId, Long namespaceId) {
     public static final int MAX_LIMIT = 100;
     public static final int MAX_QUERY_LENGTH = 160;
     public static final int MAX_CURSOR_LENGTH = 1200;
+
+    public ResourceQuery(ResourceType type, Long parentId, String query, ResourceStatus status, int limit, String cursor) {
+        this(type, parentId, query, status, limit, cursor, null, null);
+    }
 
     public ResourceQuery {
         query = query == null ? "" : query.strip();
@@ -17,6 +21,12 @@ public record ResourceQuery(ResourceType type, Long parentId, String query,
         }
         if (parentId != null && (type == null || type == ResourceType.CLUSTER)) {
             throw ResourceRequestException.invalid("parentId", "이 조회에서는 parentId를 사용할 수 없습니다.");
+        }
+        if (clusterId != null && clusterId <= 0 || namespaceId != null && namespaceId <= 0) {
+            throw ResourceRequestException.invalid("scope", "조회 범위 ID는 양수여야 합니다.");
+        }
+        if (namespaceId != null && type != null && type.depth() < ResourceType.NAMESPACE.depth()) {
+            throw ResourceRequestException.invalid("namespaceId", "Namespace 범위는 Namespace·Pod 조회에 사용할 수 있습니다.");
         }
         if (query.length() > MAX_QUERY_LENGTH || query.chars().anyMatch(Character::isISOControl)) {
             throw ResourceRequestException.invalid("q", "검색어는 제어 문자 없이 160자 이하여야 합니다.");
@@ -39,6 +49,16 @@ public record ResourceQuery(ResourceType type, Long parentId, String query,
         if (result.query().isEmpty()) {
             throw ResourceRequestException.invalid("q", "전체 검색에는 검색어가 필요합니다.");
         }
+        return result;
+    }
+
+    public static ResourceQuery list(String type, Long parentId, String query, String status, int limit, String cursor, Long clusterId, Long namespaceId) {
+        return new ResourceQuery(ResourceType.parse(type), parentId, query, ResourceStatus.parseOptional(status), limit, cursor, clusterId, namespaceId);
+    }
+
+    public static ResourceQuery search(String type, String query, String status, int limit, String cursor, Long clusterId, Long namespaceId) {
+        var result = new ResourceQuery(type == null ? null : ResourceType.parse(type), null, query, ResourceStatus.parseOptional(status), limit, cursor, clusterId, namespaceId);
+        if (result.query().isEmpty()) throw ResourceRequestException.invalid("q", "전체 검색에는 검색어가 필요합니다.");
         return result;
     }
 

@@ -1,10 +1,7 @@
 package dev.infrastructure.monitoring.resource;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.jdbc.datasource.AbstractDataSource;
 
-import java.sql.Connection;
-import java.sql.SQLException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -116,10 +113,7 @@ class ResourceServiceTest {
         Optional<Row> found = Optional.empty();
 
         StubRepository() {
-            super(new AbstractDataSource() {
-                @Override public Connection getConnection() throws SQLException { throw new SQLException("No database in unit test"); }
-                @Override public Connection getConnection(String user, String pass) throws SQLException { return getConnection(); }
-            }, 3);
+            super(org.mockito.Mockito.mock(jakarta.persistence.EntityManager.class), 3);
         }
 
         @Override public boolean exists(ResourceType type, long id) { existenceType = type; return present; }

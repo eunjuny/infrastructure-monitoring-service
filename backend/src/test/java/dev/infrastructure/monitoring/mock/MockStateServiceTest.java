@@ -2,14 +2,11 @@ package dev.infrastructure.monitoring.mock;
 
 import dev.infrastructure.monitoring.resource.ResourceType;
 import org.junit.jupiter.api.Test;
-import org.springframework.jdbc.datasource.AbstractDataSource;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.AbstractPlatformTransactionManager;
 import org.springframework.transaction.support.DefaultTransactionStatus;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import java.sql.Connection;
-import java.sql.SQLException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -27,10 +24,7 @@ class MockStateServiceTest {
         int changes;
         boolean fail, empty;
         Store() {
-            super(new AbstractDataSource() {
-                @Override public Connection getConnection() throws SQLException { throw new SQLException("No database in unit test"); }
-                @Override public Connection getConnection(String user, String password) throws SQLException { return getConnection(); }
-            }, 3);
+            super(org.mockito.Mockito.mock(jakarta.persistence.EntityManager.class), 3);
         }
         @Override public List<Long> nextIds(ResourceType type, long after, int limit) {
             queries.add(new Query(type, after, limit));

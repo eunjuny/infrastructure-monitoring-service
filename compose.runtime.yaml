@@ -1,0 +1,95 @@
+name: infrastructure-monitoring-runtime
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: monitoring
+      POSTGRES_USER: monitoring
+      POSTGRES_PASSWORD: local-monitoring-only
+    volumes:
+      - runtime-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U monitoring -d monitoring"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      DATABASE_URL: jdbc:postgresql://db:5432/monitoring
+      DATABASE_USER: monitoring
+      DATABASE_PASSWORD: local-monitoring-only
+      SERVER_ADDRESS: 0.0.0.0
+      MANAGEMENT_ADDRESS: 0.0.0.0
+      PROMETHEUS_URL: http://prometheus:9090
+      SPRING_PROFILES_ACTIVE: mock
+    ports:
+      - "127.0.0.1:${RUNTIME_API_PORT:-8082}:8081"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8086/actuator/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 20s
+  seed:
+    image: postgres:17-alpine
+    environment:
+      PGPASSWORD: local-monitoring-only
+    volumes:
+      - ./scripts/seed.sql:/seed.sql:ro
+    command: ["psql", "-h", "db", "-U", "monitoring", "-d", "monitoring", "-v", "ON_ERROR_STOP=1", "-f", "/seed.sql"]
+    depends_on:
+      backend:
+        condition: service_healthy
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    ports:
+      - "127.0.0.1:${RUNTIME_WEB_PORT:-5175}:8080"
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  prometheus:
+    image: prom/prometheus:v3.13.1
+    profiles: [monitoring]
+    ports:
+      - "127.0.0.1:${RUNTIME_PROMETHEUS_PORT:-9092}:9090"
+    volumes:
+      - ./infra/prometheus/runtime.yaml:/etc/prometheus/prometheus.yml:ro
+      - ./infra/prometheus/alerts.yaml:/etc/prometheus/alerts.yaml:ro
+      - runtime-prometheus:/prometheus
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.retention.time=7d", "--storage.tsdb.retention.size=256MB"]
+    depends_on:
+      backend:
+        condition: service_healthy
+  alertmanager:
+    image: prom/alertmanager:v0.34.0
+    profiles: [monitoring]
+    ports: ['127.0.0.1:${RUNTIME_ALERTMANAGER_PORT:-9192}:9093']
+    volumes:
+      - ./infra/alertmanager/alertmanager.yaml:/etc/alertmanager/alertmanager.yml:ro
+      - runtime-alertmanager:/alertmanager
+    command: ['--config.file=/etc/alertmanager/alertmanager.yml', '--storage.path=/alertmanager', '--data.retention=24h', '--cluster.listen-address=']
+    depends_on: [alert-receiver]
+  alert-receiver:
+    profiles: [monitoring]
+    build: {context: ., dockerfile: infra/alertmanager/Dockerfile}
+    mem_limit: 64m
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+volumes:
+  runtime-db:
+  runtime-prometheus:
+  runtime-alertmanager:

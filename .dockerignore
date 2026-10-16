@@ -1,0 +1,16 @@
+.git
+.local
+.validation
+**/.validation
+**/.local
+**/node_modules
+**/target
+**/build
+**/.gradle
+**/dist
+**/playwright-report
+**/test-results
+**/*.log
+.env*
+**/.env*
+docs

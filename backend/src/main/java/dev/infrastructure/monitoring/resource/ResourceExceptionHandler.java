@@ -4,6 +4,7 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.dao.QueryTimeoutException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -30,8 +31,8 @@ public class ResourceExceptionHandler {
         return problem(HttpStatus.SERVICE_UNAVAILABLE, "QUERY_TIMEOUT", "조회 시간이 초과되었습니다. 조건을 좁혀 다시 시도해 주세요.");
     }
 
-    @ExceptionHandler(DataAccessException.class)
-    public ProblemDetail storage(DataAccessException exception) {
+    @ExceptionHandler({DataAccessException.class, CannotCreateTransactionException.class})
+    public ProblemDetail storage(Exception exception) {
         return problem(HttpStatus.SERVICE_UNAVAILABLE, "STORAGE_UNAVAILABLE", "저장소 조회를 완료하지 못했습니다.");
     }
 

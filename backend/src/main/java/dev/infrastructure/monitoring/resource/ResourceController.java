@@ -18,20 +18,24 @@ public class ResourceController {
     @GetMapping
     public Page<Item> list(@RequestParam(defaultValue = "CLUSTER") String type,
                             @RequestParam(required = false) Long parentId,
+                            @RequestParam(required = false) Long clusterId,
+                            @RequestParam(required = false) Long namespaceId,
                             @RequestParam(defaultValue = "") String q,
                             @RequestParam(required = false) String status,
                             @RequestParam(defaultValue = "50") int limit,
                             @RequestParam(required = false) String cursor) {
-        return service.list(ResourceQuery.list(type, parentId, q, status, limit, cursor));
+        return service.list(ResourceQuery.list(type, parentId, q, status, limit, cursor, clusterId, namespaceId));
     }
 
     @GetMapping("/search")
     public Page<SearchResult> search(@RequestParam String q,
                                      @RequestParam(required = false) String type,
+                                     @RequestParam(required = false) Long clusterId,
+                                     @RequestParam(required = false) Long namespaceId,
                                      @RequestParam(required = false) String status,
                                      @RequestParam(defaultValue = "50") int limit,
                                      @RequestParam(required = false) String cursor) {
-        return service.search(ResourceQuery.search(type, q, status, limit, cursor));
+        return service.search(ResourceQuery.search(type, q, status, limit, cursor, clusterId, namespaceId));
     }
 
     @GetMapping("/{type}/{id}")

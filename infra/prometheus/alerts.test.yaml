@@ -1,0 +1,268 @@
+{
+  "rule_files": [
+    "alerts.yaml"
+  ],
+  "evaluation_interval": "15s",
+  "tests": [
+    {
+      "name": "healthy and no traffic",
+      "interval": "30s",
+      "input_series": [
+        {
+          "series": "up{job=\"infrastructure-api\",instance=\"backend:8086\"}",
+          "values": "1x24"
+        },
+        {
+          "series": "infrastructure_mock_failures_total{job=\"infrastructure-api\"}",
+          "values": "0x24"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "5m",
+          "alertname": "BackendScrapeUnavailable",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "5m",
+          "alertname": "ResourceApiErrorBurst",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "5m",
+          "alertname": "MockBatchFailures",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "name": "brief scrape failure does not fire",
+      "interval": "30s",
+      "input_series": [
+        {
+          "series": "up{job=\"infrastructure-api\",instance=\"backend:8086\"}",
+          "values": "1 0 0 1x20"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "1m",
+          "alertname": "BackendScrapeUnavailable",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "2m",
+          "alertname": "BackendScrapeUnavailable",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "name": "scrape failure fires and resolves",
+      "interval": "30s",
+      "input_series": [
+        {
+          "series": "up{job=\"infrastructure-api\",instance=\"backend:8086\"}",
+          "values": "1 0x6 1x20"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "2m",
+          "alertname": "BackendScrapeUnavailable",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "job": "infrastructure-api",
+                "severity": "critical",
+                "instance": "backend:8086"
+              },
+              "exp_annotations": {
+                "summary": "Backend metrics are unavailable",
+                "runbook": "docs/ALERTING_AND_RECOVERY.md#backend"
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "4m",
+          "alertname": "BackendScrapeUnavailable",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "name": "missing target is not healthy",
+      "interval": "30s",
+      "input_series": [
+        {
+          "series": "infrastructure_mock_failures_total{job=\"infrastructure-api\"}",
+          "values": "0x24"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "2m",
+          "alertname": "BackendScrapeUnavailable",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "job": "infrastructure-api",
+                "severity": "critical"
+              },
+              "exp_annotations": {
+                "summary": "Backend metrics are unavailable",
+                "runbook": "docs/ALERTING_AND_RECOVERY.md#backend"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "low volume errors do not create misleading ratio alarm",
+      "interval": "30s",
+      "input_series": [
+        {
+          "series": "up{job=\"infrastructure-api\",instance=\"backend:8086\"}",
+          "values": "1x24"
+        },
+        {
+          "series": "http_server_requests_seconds_count{job=\"infrastructure-api\",uri=\"/api/resources\",status=\"500\"}",
+          "values": "0+1x24"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "5m",
+          "alertname": "ResourceApiErrorBurst",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "name": "sustained API errors fire and clear after recovery",
+      "interval": "30s",
+      "input_series": [
+        {
+          "series": "up{job=\"infrastructure-api\",instance=\"backend:8086\"}",
+          "values": "1x30"
+        },
+        {
+          "series": "http_server_requests_seconds_count{job=\"infrastructure-api\",uri=\"/api/resources\",status=\"200\"}",
+          "values": "0+10x30"
+        },
+        {
+          "series": "http_server_requests_seconds_count{job=\"infrastructure-api\",uri=\"/api/resources\",status=\"500\"}",
+          "values": "0+3x12 36x18"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "5m",
+          "alertname": "ResourceApiErrorBurst",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "job": "infrastructure-api",
+                "severity": "warning"
+              },
+              "exp_annotations": {
+                "summary": "Resource API server errors are sustained",
+                "runbook": "docs/ALERTING_AND_RECOVERY.md#api-errors"
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "13m",
+          "alertname": "ResourceApiErrorBurst",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "name": "authorization errors are not server failures",
+      "interval": "30s",
+      "input_series": [
+        {
+          "series": "up{job=\"infrastructure-api\",instance=\"backend:8086\"}",
+          "values": "1x24"
+        },
+        {
+          "series": "http_server_requests_seconds_count{job=\"infrastructure-api\",uri=\"/api/resources\",status=\"401\"}",
+          "values": "0+10x24"
+        },
+        {
+          "series": "http_server_requests_seconds_count{job=\"infrastructure-api\",uri=\"/api/resources\",status=\"403\"}",
+          "values": "0+10x24"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "5m",
+          "alertname": "ResourceApiErrorBurst",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "name": "repeated batch failures fire and expire",
+      "interval": "30s",
+      "input_series": [
+        {
+          "series": "up{job=\"infrastructure-api\",instance=\"backend:8086\"}",
+          "values": "1x30"
+        },
+        {
+          "series": "infrastructure_mock_failures_total{job=\"infrastructure-api\"}",
+          "values": "0+1x6 6x24"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "3m",
+          "alertname": "MockBatchFailures",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "job": "infrastructure-api",
+                "severity": "warning"
+              },
+              "exp_annotations": {
+                "summary": "Mock resource update batches repeatedly failed",
+                "runbook": "docs/ALERTING_AND_RECOVERY.md#mock"
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "10m",
+          "alertname": "MockBatchFailures",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "name": "two failures stay below batch threshold",
+      "interval": "30s",
+      "input_series": [
+        {
+          "series": "up{job=\"infrastructure-api\",instance=\"backend:8086\"}",
+          "values": "1x24"
+        },
+        {
+          "series": "infrastructure_mock_failures_total{job=\"infrastructure-api\"}",
+          "values": "0 1 2x22"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "5m",
+          "alertname": "MockBatchFailures",
+          "exp_alerts": []
+        }
+      ]
+    }
+  ]
+}

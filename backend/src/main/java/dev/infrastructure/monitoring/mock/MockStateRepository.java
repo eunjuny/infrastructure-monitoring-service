@@ -2,30 +2,33 @@ package dev.infrastructure.monitoring.mock;
 
 import dev.infrastructure.monitoring.resource.ResourceType;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.Query;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Repository;
 
-import javax.sql.DataSource;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 
 /** Only called by the opt-in local simulator; no HTTP mutation endpoint is exposed. */
 @Repository
+@Transactional(propagation = Propagation.MANDATORY)
 public class MockStateRepository {
-    private final NamedParameterJdbcTemplate jdbc;
+    private final EntityManager entityManager;
+    private final int timeoutMillis;
 
-    public MockStateRepository(DataSource source, @Value("${monitoring.query-timeout-seconds:3}") int timeout) {
+    public MockStateRepository(EntityManager entityManager, @Value("${monitoring.query-timeout-seconds:3}") int timeout) {
         if (timeout < 1) throw new IllegalArgumentException("Query timeout must be positive");
-        jdbc = new NamedParameterJdbcTemplate(source);
-        jdbc.getJdbcTemplate().setQueryTimeout(timeout);
+        this.entityManager = entityManager;
+        timeoutMillis = Math.multiplyExact(timeout, 1000);
     }
 
     public List<Long> nextIds(ResourceType type, long after, int limit) {
         if (after < 0 || limit < 1 || limit > 100) throw new IllegalArgumentException("Invalid mock batch");
-        return jdbc.queryForList(selectionSql(type), Map.of("after", after, "limit", limit), Long.class);
+        List<?> rows = query(selectionSql(type)).setParameter("after", after).setParameter("limit", limit).getResultList();
+        return rows.stream().map(value -> ((Number) value).longValue()).toList();
     }
 
     public int change(ResourceType type, List<Long> ids, Instant changedAt) {
@@ -33,8 +36,27 @@ public class MockStateRepository {
         if (ids.size() > 100 || ids.stream().anyMatch(id -> id == null || id <= 0)) {
             throw new IllegalArgumentException("Invalid mock IDs");
         }
-        return jdbc.update(updateSql(type), new MapSqlParameterSource("ids", ids)
-                .addValue("changedAt", Timestamp.from(changedAt)));
+        String attributes = switch (type) {
+            case NODE -> "jsonb_build_object('cpuUsage',cpu_usage,'memoryUsage',memory_usage)";
+            case POD -> "jsonb_build_object('restartCount',restart_count)";
+            default -> "'{}'::jsonb";
+        };
+        String statement = "with previous as materialized (select id,status," + attributes
+                + " attributes from " + type.table() + " where id in (:ids) for update), changed as ("
+                + updateSql(type) + " and id in (select id from previous) returning id,status," + attributes + " attributes)"
+                + " insert into resource_change_event(resource_type,resource_id,occurred_at,previous_status,next_status,source,before_attributes,after_attributes)"
+                + " select '" + type.name() + "',changed.id,:changedAt,previous.status,changed.status,'MOCK_SIMULATOR',previous.attributes,changed.attributes"
+                + " from changed join previous on previous.id=changed.id";
+        // Keep DB-specific update + event insertion atomic; never mix bulk DML with stale managed entities.
+        entityManager.flush();
+        int changed = query(statement).unwrap(org.hibernate.query.NativeQuery.class)
+                .setParameterList("ids", ids).setParameter("changedAt", Timestamp.from(changedAt)).executeUpdate();
+        entityManager.clear();
+        return changed;
+    }
+
+    private Query query(String sql) {
+        return entityManager.createNativeQuery(sql).setHint("jakarta.persistence.query.timeout", timeoutMillis);
     }
 
     String selectionSql(ResourceType type) {

@@ -9,6 +9,7 @@ const projectRoot = fileURLToPath(new URL('../../', import.meta.url))
 const output = fileURLToPath(new URL('../.validation/performance/', import.meta.url))
 const repetitions = Number(process.env.PERF_REPETITIONS || 20)
 const label = process.env.PERF_LABEL || 'baseline'
+const initialOnly = process.env.PERF_INITIAL_ONLY === '1'
 if (!Number.isInteger(repetitions) || repetitions < 3 || repetitions > 50 || !/^[a-z0-9-]+$/.test(label)) throw new Error('Invalid measurement options')
 await mkdir(output, { recursive: true })
 const browser = await chromium.launch({ headless: true })
@@ -109,6 +110,11 @@ try {
         resources: performance.getEntriesByType('resource').map(entry => ({ name: new URL(entry.name).pathname, duration: entry.duration, start: entry.startTime, responseEnd: entry.responseEnd, transfer: entry.transferSize })),
         domContentLoaded: performance.getEntriesByType('navigation')[0].domContentLoadedEventEnd,
       })))
+      if (initialOnly) {
+        await state.context.close()
+        process.stdout.write(`Initial ${iteration + 1}/${repetitions}: ${measurements.initial.at(-1)}ms\n`)
+        continue
+      }
       await page.getByLabel('자동 갱신').uncheck()
       await arm(page, 'expand', 'node-001', 'event', 'button[aria-label="cluster-01 펼치기"]')
       await page.getByRole('button', { name: 'cluster-01 펼치기', exact: true }).click()
@@ -139,6 +145,15 @@ try {
     await state.context.close()
     process.stdout.write(`Measured ${iteration + 1}/${repetitions}\n`)
   }
+  if (initialOnly) {
+    const values = [...measurements.initial].sort((a, b) => a - b), middle = Math.floor(values.length / 2)
+    const initial = { count: values.length, median: values.length % 2 ? values[middle] : (values[middle - 1] + values[middle]) / 2,
+      p95: values[Math.ceil(values.length * .95) - 1], max: values.at(-1), target: 500, overTarget: values.filter(value => value > 500).length }
+    const report = { environment, initialOnly: true, summary: { initial }, measurements: { initial: measurements.initial }, initialDetails, errors }
+    await writeFile(`${output}/${label}.json`, JSON.stringify(report, null, 2))
+    process.stdout.write(JSON.stringify({ initialOnly: true, summary: report.summary, errors }, null, 2) + '\n')
+    if (initial.overTarget || errors.length) process.exitCode = 1
+  } else {
   if (!retained) throw new Error('No successful measurement context')
   const { page, session } = retained
   for (let index = 0; index < 4; index++) {
@@ -210,4 +225,5 @@ try {
   await writeFile(`${output}/${label}.json`, JSON.stringify(report, null, 2))
   await writeFile(`${output}/${label}-trace.json`, JSON.stringify({ traceEvents }))
   process.stdout.write(JSON.stringify({ summary, errors, scroll: report.scroll.rafFPS, memory: report.memory, traceFrameNames: frameNames }, null, 2) + '\n')
+  }
 } finally { await browser.close() }

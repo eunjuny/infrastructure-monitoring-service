@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, shallowRef } from 'vue'
 import { api, keyOf, errorMessage, type Page, type Resource, type Reference } from '../api'
 import VirtualList from './VirtualList.vue'
 import UiIcon from './UiIcon.vue'
@@ -119,7 +119,8 @@ async function reveal(path: Reference[]) {
   } catch (cause) { if (token === revision && !signal.aborted) error.value = errorMessage(cause) }
   finally { if (token === revision) loading.value = false }
 }
-onMounted(refresh)
+// Fetch root data while the surrounding console is still mounting, not afterwards.
+void refresh()
 onBeforeUnmount(() => { controller?.abort(); revision++ })
 function stop() { controller?.abort(); revision++; loading.value = false }
 defineExpose({ refresh, reveal, stop, isBusy: () => loading.value, hasError: () => Boolean(error.value) })

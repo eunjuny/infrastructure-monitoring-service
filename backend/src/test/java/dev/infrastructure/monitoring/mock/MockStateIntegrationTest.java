@@ -40,9 +40,12 @@ class MockStateIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired DataSource source;
     @Autowired MockStateRepository repository;
+    @Autowired jakarta.persistence.EntityManager entityManager;
     @Autowired org.springframework.transaction.PlatformTransactionManager manager;
+    @Autowired dev.infrastructure.monitoring.history.ResourceHistoryRepository history;
 
     @BeforeEach void prepare() {
+        jdbc.update("delete from resource_change_event");
         if (jdbc.queryForObject("select count(*) from infrastructure_pod", Long.class) == 0) {
             new ResourceDatabasePopulator(new ClassPathResource("seed.sql")).execute(source);
         }
@@ -85,7 +88,7 @@ class MockStateIntegrationTest {
 
     @Test void failedTickRollsBackEarlierTypesAndRetriesTheSameIDs() {
         String before = jdbc.queryForObject("select status from infrastructure_cluster where id=1", String.class);
-        var failure = new MockStateRepository(source, 3) {
+        var failure = new MockStateRepository(entityManager, 3) {
             boolean fail = true;
             @Override public int change(ResourceType type, List<Long> ids, Instant time) {
                 if (fail && type == ResourceType.POD) { fail = false; throw new IllegalStateException("Test failure"); }
@@ -96,7 +99,34 @@ class MockStateIntegrationTest {
         assertThrows(IllegalStateException.class, service::advance);
         assertEquals(before, jdbc.queryForObject("select status from infrastructure_cluster where id=1", String.class));
         assertEquals("NORMAL", jdbc.queryForObject("select status from infrastructure_node where id=1", String.class));
+        assertEquals(0,jdbc.queryForObject("select count(*) from resource_change_event",Integer.class));
         service.advance();
         assertEquals("WARNING", jdbc.queryForObject("select status from infrastructure_pod where id=1", String.class));
+    }
+
+    @Test void historyContainsAtomicBeforeAfterAttributesAndUsesBoundedPages() throws Exception {
+        service(repository).advance();
+        assertEquals(116,jdbc.queryForObject("select count(*) from resource_change_event",Integer.class));
+        mvc.perform(get("/api/resources/NODE/1/events"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].previousStatus").value("NORMAL"))
+                .andExpect(jsonPath("$.items[0].nextStatus").value("WARNING"))
+                .andExpect(jsonPath("$.items[0].beforeAttributes.cpuUsage").value(98))
+                .andExpect(jsonPath("$.items[0].afterAttributes.cpuUsage").value(4))
+                .andExpect(jsonPath("$.maximumEvents").value(20000));
+        mvc.perform(get("/api/resources/POD/1/events").param("limit","101")).andExpect(status().isBadRequest());
+        mvc.perform(get("/api/resources/POD/999999/events")).andExpect(status().isNotFound());
+        service(repository).advance();
+        var newest=history.list(ResourceType.POD,1,null,1).get(0);
+        assertEquals(1,history.list(ResourceType.POD,1,newest.id(),20).size());
+    }
+
+    @Test void retentionCleanupIsBoundedAndKeepsNewestRows() {
+        service(repository).advance();
+        assertEquals(10,history.cleanup(24,100,10));
+        assertEquals(106,jdbc.queryForObject("select count(*) from resource_change_event",Integer.class));
+        assertEquals(6,history.cleanup(24,100,10));
+        assertEquals(100,jdbc.queryForObject("select count(*) from resource_change_event",Integer.class));
+        jdbc.update("update resource_change_event set occurred_at=now()-interval '2 days'");
+        assertEquals(10,history.cleanup(24,100,10));
     }
 }

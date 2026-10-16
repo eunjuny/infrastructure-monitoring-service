@@ -29,6 +29,26 @@ test('real seed counts, lazy hierarchy, parent list and typed details', async ({
   await expect(page.locator('.attributes')).toContainText('메모리 사용률 (%)')
 })
 
+test('optional code is loaded on demand while initial data and timestamps remain complete', async ({ page }) => {
+  const scripts = () => page.evaluate(() => performance.getEntriesByType('resource').map(entry => new URL(entry.name).pathname))
+  await expect(page.locator('.cards')).toContainText('100,000')
+  await expect(page.locator('.tree-name').first()).toContainText('cluster-01')
+  expect((await scripts()).some(path => /OperationsDashboard-|ResourceEvents-|ResourceDetail-/.test(path))).toBe(false)
+  await expect(page.locator('.scope-options')).toHaveCount(0)
+  await expect(page.locator('.resource-row time').first()).toHaveText(/^\d{2}:\d{2}:\d{2}$/)
+  await expect(page.locator('.resource-row time').first()).toHaveAttribute('title', /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)
+  await expect(page.locator('.resource-row time').first()).toHaveAttribute('datetime', /Z$/)
+  await page.getByRole('button', { name: '운영 관측', exact: true }).click()
+  await expect(page.locator('.operations-dashboard h1')).toHaveText('서비스 운영 관측')
+  expect((await scripts()).some(path => /OperationsDashboard-/.test(path))).toBe(true)
+  await page.getByRole('button', { name: '리소스', exact: true }).click()
+  await page.getByRole('button', { name: 'Node 전체 목록 보기' }).click()
+  await page.locator('.resource-row').first().click()
+  await page.getByRole('button', { name: '변경 이력 보기', exact: true }).click()
+  await expect(page.locator('.event-history')).toBeVisible()
+  expect((await scripts()).some(path => /ResourceEvents-/.test(path))).toBe(true)
+})
+
 test('database name search, full path reveal and combined status filter', async ({ page }) => {
   await page.locator('.filters input').fill('worker-pod-000001')
   await expect(page.locator('.resource-row')).toHaveCount(1)
@@ -58,6 +78,56 @@ test('empty search and invalid requests return safe states', async ({ page, requ
   expect(missing.status()).toBe(404)
 })
 
+test('cluster and namespace scope stays applied to name and status filtering', async ({ page, request }) => {
+  await page.getByLabel('자동 갱신').uncheck()
+  await page.locator('.scope-filters summary').click()
+  await page.getByLabel('Cluster 범위', { exact: true }).selectOption('2')
+  await expect(page.locator('.resource-row').first()).toContainText('worker-pod-005001')
+  await expect(page.getByLabel('Namespace 범위', { exact: true }).locator('option[value="101"]')).toHaveCount(1)
+  await page.getByLabel('Namespace 범위', { exact: true }).selectOption('101')
+  await page.locator('.filters input').fill('pod')
+  await page.locator('.filters select').nth(1).selectOption('ERROR')
+  await expect.poll(async () => {
+    const badges = await page.locator('.resource-row .badge').allTextContents()
+    return badges.length > 0 && badges.every(badge => badge === '오류')
+  }).toBe(true)
+  const response = await request.get('/api/resources/search?type=POD&clusterId=2&namespaceId=101&q=pod&status=ERROR')
+  expect(response.status()).toBe(200)
+  const result = await response.json()
+  expect(result.items.length).toBeGreaterThan(0)
+  expect(result.items.every((row: { path: { id: number }[]; resource: { parent: { id: number } } }) => row.path[0]!.id === 2 && row.resource.parent.id === 101)).toBe(true)
+  const conflict = await request.get('/api/resources?type=POD&clusterId=1&namespaceId=101')
+  expect(conflict.status()).toBe(400)
+})
+
+test('committed mock changes have readable history', async ({ page, request }) => {
+  await page.getByRole('button', { name: 'Node 전체 목록 보기' }).click()
+  await page.locator('.resource-row').first().click()
+  await page.getByRole('button', { name: '변경 이력 보기', exact: true }).click()
+  await expect(page.locator('.event-history')).toContainText('시뮬레이터')
+  const response = await request.get('/api/resources/NODE/1/events')
+  expect(response.status()).toBe(200)
+  expect((await response.json()).maximumEvents).toBe(20000)
+  await expect.poll(async () => (await (await request.get('/api/resources/NODE/1/events')).json()).items.length, { timeout: 15000 }).toBeGreaterThan(0)
+  await page.getByRole('button', { name: '이력 새로고침', exact: true }).click()
+  await expect(page.locator('.event-history li').first()).toContainText('Mock 시뮬레이터')
+})
+
+test('operations screen displays actual Prometheus samples', async ({ page, request }) => {
+  test.skip(!process.env.E2E_MONITORING, 'Requires the monitoring Compose profile')
+  const result = await (await request.get('/api/operations/metrics')).json()
+  expect(result.available).toBe(true); expect(result.source).toBe('Prometheus')
+  expect(result.values.up).toBe(1); expect(result.values.heap).toBeGreaterThan(0)
+  await page.getByRole('button', { name: '운영 관측', exact: true }).click()
+  await expect(page.locator('.operations-dashboard > .scope-note')).toContainText('Prometheus')
+  await expect(page.locator('.operation-cards > div')).toHaveCount(10)
+  await expect(page.locator('.alert-rules > li')).toHaveCount(3, { timeout: 30000 })
+  const alerts = await (await request.get('/api/operations/alerts')).json()
+  expect(alerts.available).toBe(true)
+  expect(alerts.rules.map((rule: { name: string }) => rule.name)).toEqual(['BackendScrapeUnavailable', 'ResourceApiErrorBurst', 'MockBatchFailures'])
+  await page.screenshot({ path: '.validation/screenshots/operations-prometheus.png', fullPage: true })
+})
+
 test('sequential global Pod browsing keeps the 500-row cache and small DOM', async ({ page }) => {
   await page.getByLabel('자동 갱신').uncheck()
   for (let index = 0; index < 6; index++) {
@@ -82,7 +152,10 @@ test('committed DB changes appear automatically without losing selected detail o
   await viewport.evaluate(element => { element.scrollTop = 1200 })
   const scroll = await viewport.evaluate(element => element.scrollTop)
   expect(scroll).toBe(1200)
-  execFileSync('docker', ['compose', 'exec', '-T', 'db', 'psql', '-U', 'monitoring', '-d', 'monitoring', '-v', 'ON_ERROR_STOP=1', '-c',
+  const composeFile = process.env.TEST_COMPOSE_FILE || 'compose.yaml'
+  const composeProject = process.env.TEST_COMPOSE_PROJECT
+  if (!['compose.yaml', 'compose.runtime.yaml'].includes(composeFile) || composeProject && !/^[a-z0-9-]+$/.test(composeProject)) throw new Error('Unexpected test Compose target')
+  execFileSync('docker', ['compose', '-f', composeFile, ...(composeProject ? ['-p', composeProject] : []), 'exec', '-T', 'db', 'psql', '-U', 'monitoring', '-d', 'monitoring', '-v', 'ON_ERROR_STOP=1', '-c',
     `update infrastructure_pod set status='${nextStatus}', updated_at=clock_timestamp() where id=1;`],
     { cwd: fileURLToPath(new URL('../../', import.meta.url)), stdio: 'pipe' })
   await expect(page.locator('.detail-panel > .badge')).toHaveText(label)
