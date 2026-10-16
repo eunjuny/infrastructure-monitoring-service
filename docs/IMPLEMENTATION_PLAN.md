@@ -6,6 +6,10 @@
 
 과제의 Cluster → Node → Namespace → Pod는 탐색용 모델이며 실제 Kubernetes 객체 관계와 다릅니다.
 
+추가 요청으로 [선택형 Keycloak 인증](AUTHENTICATION.md)을 구현했습니다. 서비스 관리자와 A/B의 서로 다른 Cluster 범위를 기존 10만 Pod에 적용하며 기본 과제 모드와 분리합니다. 아래 초기 제외 판단은 과제 필수 범위 당시의 기록이며 Keycloak은 이후 사용자 요청으로 추가한 항목입니다.
+
+현재 백엔드 빌드는 사용자 요청으로 Maven에서 Gradle Wrapper·Kotlin DSL로 전환했습니다. 기존 라이브러리/서비스 코드는 유지하며 전환 근거·실행·잠금·검증은 [Gradle 빌드](GRADLE_BUILD.md)를 참고합니다. 아래 과거 Maven 검증 숫자는 해당 시점의 기록입니다.
+
 ## 요구사항과 진행 상태
 
 | 요구 | 계획 | 상태 |
@@ -18,6 +22,10 @@
 | 갱신 | 수동·현재 조회 창 폴링 | Mock 변경·자동 반영·선택·스크롤 유지 검증 통과 |
 | DOM 수 제한 | 가상 리스트·서버 페이지·제한 캐시 | 실제 브라우저 500행 캐시·20개 이하 DOM·추가 100페이지 탐색 확인 |
 | 성능 검증 | Chrome 4x CPU, 캐시 OFF, 프로덕션 빌드 | 20회 반복·합성 프레임·메모리·실행 계획 측정, 상세 판정은 성능 보고서 |
+| 범위 필터 | Cluster·Namespace와 이름·상태 조합 | 실제 DB·범위 커서·소속 검증·화면 E2E 통과 |
+| 변경 이력 | 상태·속성과 원자적 저장·제한 보관 | V3·커밋·롤백·커서·정리·화면 검증 통과 |
+| Prometheus | 서비스 계측·수집·고정 조회·차트 | 실제 up=1·카드·P95·장애/응답 상한 검증 |
+| Compose CI/Jenkins | 전체 이미지·격리 환경·자동 테스트 | 로컬 Jenkins 성공; GitHub 실행은 미검증 |
 
 ## 계층 데이터 모델링
 
@@ -37,4 +45,4 @@ V1은 부모별 이름 유일성과 (부모 ID, 상태, ID), Pod의 (상태, ID)
 
 ## 검증 및 제외 범위
 
-정식 Maven 테스트 69개(실제 PostgreSQL 통합 17개 포함), Vitest 56개, 실제 API Chromium E2E 7개가 통과했습니다. [후속 검증 보고서](STAGE4_REPORT.md), [UI 검증](UI_DESIGN.md), [성능·안정성 보강](PERFORMANCE_RESULTS.md)에 근거를 기록했습니다. 이전 제한 기록은 [1단계](VALIDATION_REPORT.md), [2단계](STAGE2_REPORT.md), [3단계](STAGE3_REPORT.md)에 유지합니다. 실제 Kubernetes, Keycloak, Redis, Kafka, Elasticsearch, MSA는 필수 요구 해결의 근거가 없어 제외했습니다.
+초기 확장은 Maven 79개(실제 PostgreSQL 통합 22개 포함), Vitest 61개, 실제 API Chromium E2E 10개가 통과했습니다. 이후 JPA Entity·DTO projection으로 전환하고 N+1·SQL 횟수·생성 SQL 인덱스·timeout 통합 검증을 추가했습니다. 최신 숫자는 [기준 문서](PROJECT_GUIDE.md), 전환 설계는 [JPA 조회 설계](JPA_QUERY_DESIGN.md)를 참고합니다. [확장·CI 검증](OPERATIONS_AND_DELIVERY.md), [초기 후속 검증 보고서](STAGE4_REPORT.md), [UI 검증](UI_DESIGN.md), [성능·안정성 보강](PERFORMANCE_RESULTS.md)에 근거를 기록했습니다. 이전 제한 기록은 [1단계](VALIDATION_REPORT.md), [2단계](STAGE2_REPORT.md), [3단계](STAGE3_REPORT.md)에 유지합니다. 실제 Kubernetes, Keycloak, Redis, Kafka, Elasticsearch, MSA는 필수 요구 해결의 근거가 없어 제외했습니다.

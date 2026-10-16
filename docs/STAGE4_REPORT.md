@@ -1,5 +1,7 @@
 # 실제 DB 검증과 Mock·자동 갱신 결과
 
+당시 Maven/POM/target 명령과 결과 경로는 역사 기록입니다. 현재 실행·보고서 경로는 [Gradle 빌드](GRADLE_BUILD.md)를 따릅니다.
+
 기준일: 2026-10-14. 기존 Auknowlog와 독립적으로 작업했습니다. 소스는 `project/infrastructure-monitoring-service`에 있습니다. 아래는 실제 실행 검증 당시 기록이며 이후 단계별 로컬 커밋으로 정리했습니다. 푸시는 하지 않았습니다.
 
 ## 이전 중단 원인과 조치

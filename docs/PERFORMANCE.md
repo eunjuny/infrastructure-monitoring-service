@@ -59,3 +59,24 @@ DB 실행 계획은 프로젝트 루트에서 다음과 같이 확인합니다. 
 ```bash
 docker compose exec -T db psql -U monitoring -d monitoring -v ON_ERROR_STOP=1 < scripts/explain.sql
 ```
+
+## 추가 검색·계층·자동 갱신 측정
+
+선택형 Keycloak 관리자의 실제 로그인·SSO 재진입과 탐색은 별도 도구로 측정합니다. 기본 스크립트의 URL/10만 건 준비 조건을 토큰 주입으로 우회하지 않습니다. `PERF_LABEL=auth-admin-local python3 scripts/test-auth.py --performance`를 프로젝트 루트에서 실행하며 세부 구간과 40회 결과는 [인증 관리자 성능 보고서](AUTHENTICATION_PERFORMANCE.md)를 참고합니다. 비밀번호 로그인 제출·전체 SSO 재진입·callback 문서 렌더링을 분리하고 갱신은 DB를 변경하지 않는 읽기 전용입니다. 기존 변경값 전파·5페이지·스크롤·메모리 검증을 대신하지 않습니다.
+
+같은 DB·API·프로덕션 preview 환경에서 아래 명령을 사용합니다.
+
+```bash
+cd frontend
+PERF_LABEL=edge-check npm run test:performance:edges
+```
+
+- 기본 20회씩 한 글자 흔한 검색 `w`, 미일치 `z`, 흔한 부분 문자열 `pod`, 전체 유형 `0`, 전체 유형+ERROR `node`를 측정합니다. 디바운스 이후 fetch 시작부터 실제 목록·빈 결과 표시까지입니다. 반환 데이터의 이름·유형·상태도 검증합니다.
+- Cluster 8개를 순서대로 각각 펼칩니다. 초기화 후 20회 반복해 총 160개 클릭의 네트워크 포함 반영 시간을 기록합니다. 아홉 번째 부모를 펼치면 첫 번째 펼침이 해제되는지도 확인합니다.
+- 목록 5페이지·500개, 펼친 부모 8개와 루트, 선택 상세를 유지한 상태에서 실제 DB의 Pod 1을 변경합니다. 자동 폴링의 첫 목록 요청부터 전체 갱신 그룹 완료·변경 배지 표시까지 20회 기록합니다. DB 변경 확인 후 첫 요청까지의 대기 시간은 별도 `detectionDelay`이며 200ms 처리 목표와 합치지 않습니다.
+- 정상적인 자동 갱신 그룹은 목록 5회·계층 9회·상세 1회의 GET을 사용하고 건수 집계를 제외하는지도 실제 요청 목록으로 확인합니다.
+- 응답을 복제해 검증하는 측정용 코드의 처리 비용도 포함됩니다. 이 계측은 제품 번들에 포함하지 않습니다. 네트워크 기록의 `ended`는 응답 헤더 수신 시점이며 전체 본문 처리 시간을 뜻하지 않습니다.
+- 자동 갱신 측정 종료 시 Pod 1의 상태·updated_at을 최초 스냅샷으로 복원합니다. 마지막 테스트 변경 시각과 DB 시각이 일치할 때만 복원해 중간에 다른 작업이 수정한 값을 덮지 않습니다. 재시작 수 등 다른 속성은 변경하지 않습니다. 실사용 DB에는 실행하지 않습니다.
+- 결과는 `frontend/.validation/performance/<label>.json`에 생성합니다. 오류·목표 초과·관측 DOM·JS heap을 함께 남기며 Chrome 작업관리자 메모리와 구분합니다. 현재 원격 작업의 상세 결과는 [추가 성능 검증 보고서](PERFORMANCE_EDGE_RESULTS.md)에 있습니다.
+
+Mac이 잠겨 있어도 로컬 API와 headless Chromium의 반복 측정은 가능합니다. 다만 Chrome 작업관리자는 네이티브 화면 접근이 필요합니다. 잠금을 우회하거나 RSS·JS heap을 탭 메모리의 동일 지표로 취급하지 않습니다.

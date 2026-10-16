@@ -1,0 +1,33 @@
+{
+  "date": "2026-10-16",
+  "scope": "current hardening source; isolated fixture Git checkout; original repository not committed/pushed",
+  "fixtureCommit": "3584ab7a84da978fe444dcb00624230fbfbe6917",
+  "jenkinsBuild": 12,
+  "jenkinsResult": "ABORTED",
+  "reason": "Public base-image metadata phase was waiting on docker-credential-desktop; cancelled without weakening security settings. Exact credential-helper cause not established.",
+  "controllerReusedWithoutRebuild": true,
+  "quality": {"offlineTests": 39, "result": "passed"},
+  "backend": {"tests": 107, "realPostgresqlTestsIncluded": 44, "failures": 0, "errors": 0, "skipped": 0, "result": "passed"},
+  "focusedSecurityAndPoolTests": 14,
+  "authenticationIntegrationTests": 12,
+  "poolExhaustionIntegrationTests": 2,
+  "frontend": {"tests": 77, "typecheck": "passed", "build": "passed", "auditStage": "passed"},
+  "newImagesVerified": false,
+  "newBasicBrowserE2eVerified": false,
+  "newKeycloakBrowserE2eVerified": false,
+  "newRecoveryDrillVerified": false,
+  "provenanceComplete": false,
+  "cleanup": "passed",
+  "remainingCiContainers": 0,
+  "nativeChromeTaskManagerMemoryVerified": false,
+  "nativeChromeFpsMeterVerified": false,
+  "nativeVerificationBlocker": "Computer Use Accessibility/Screen Recording approval pending",
+  "paidAiCloudOrSmtpCalls": false,
+  "notes": [
+    "Exp missing and malformed groups were reproduced as HTTP 200 before tightening signed-token validation; this was not unsigned-token access.",
+    "Pool fault fixture uses two connections and a temporary 350ms acquisition timeout; production 3000ms acquisition/1000ms validation defaults are asserted separately.",
+    "Pool release restores the 100000-Pod summary and bounded list. SQL timeout is separate from acquisition waiting and is not an end-to-end latency guarantee.",
+    "Previous full Jenkins build 11 success is retained as history, not a full validation claim for this changed source.",
+    "No remaining unverified stage is counted as passed. Manual UI permission work is documented separately."
+  ]
+}

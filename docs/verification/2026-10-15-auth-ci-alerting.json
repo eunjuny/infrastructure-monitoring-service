@@ -1,0 +1,50 @@
+{
+  "date": "2026-10-15",
+  "jenkins": {
+    "build": 10,
+    "result": "SUCCESS",
+    "anonymousBlocked": true,
+    "credentialsExposed": false
+  },
+  "backend": {
+    "tests": 102,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "frontend": {
+    "tests": 77,
+    "failures": 0
+  },
+  "browser": {
+    "tests": 11,
+    "failures": 0
+  },
+  "keycloak": {
+    "startTime": "2026-10-15T01:17:10.035Z",
+    "duration": 5487.8240000000005,
+    "expected": 5,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "recovery": {
+    "success": true,
+    "steps": {
+      "firingSeconds": 63.24,
+      "independentNotificationSeconds": 68.63,
+      "resolvedNotificationSeconds": 84.26,
+      "dataPreserved": true
+    },
+    "scope": "isolated-ci-backend-only",
+    "smtpUsed": false
+  },
+  "ruleScenarios": 9,
+  "offlineRegressionTests": 26,
+  "ciStorage": "app and identity PostgreSQL tmpfs",
+  "limitations": [
+    "Local trusted runner and loopback start-dev only",
+    "No cloud CD, SMTP, durable incident history or automatic recovery",
+    "Performance measured separately"
+  ]
+}

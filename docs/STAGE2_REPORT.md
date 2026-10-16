@@ -1,6 +1,10 @@
 # 2단계 조회 API 구현·검증 보고서
 
+당시 Maven/POM 명령은 역사 기록입니다. 현재 실행·보고서 경로는 [Gradle 빌드](GRADLE_BUILD.md)를 따릅니다.
+
 이 문서는 2026-10-13 당시 결과입니다. 이후 실제 DB·정식 빌드·브라우저 검증을 완료했으며 현재 결과는 [후속 보고서](STAGE4_REPORT.md)에 기록했습니다.
+
+이 보고서는 초기 JDBC 조회 구현 당시의 기록입니다. 현재는 [JPA Entity·DTO 조회](JPA_QUERY_DESIGN.md)로 전환했으며 최신 검증은 [기준 문서](PROJECT_GUIDE.md)를 참고합니다.
 
 ## 구현 범위
 

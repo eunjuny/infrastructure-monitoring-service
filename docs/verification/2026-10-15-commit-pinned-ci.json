@@ -1,0 +1,52 @@
+{
+  "date": "2026-10-15",
+  "scope": "isolated fixture Git repository; original repository not committed or pushed",
+  "jenkinsBuild": 11,
+  "result": "SUCCESS",
+  "fixtureCommit": "d3b76453ee9c12c5a1dc2e7776e1807ae745a94e",
+  "fixtureTree": "8854b6d7fde68f416fd7b107ba3ba5103bacdd43",
+  "cleanIndependentCheckout": true,
+  "allEightSharedStagesPassed": true,
+  "backend": {"tests": 102, "failures": 0, "errors": 0, "skipped": 0, "realPostgresqlTestsIncluded": 39},
+  "frontendTests": 77,
+  "basicBrowserTests": 11,
+  "realKeycloakBrowserTests": 5,
+  "jenkinsCollectedJUnitCases": 107,
+  "jenkinsJUnitFailures": 0,
+  "jenkinsJUnitSkipped": 0,
+  "ruleScenarios": 9,
+  "offlineRegressionTests": 38,
+  "images": {
+    "backend": "sha256:890a736fb4906f6b1e9c76f1c45afc38518b69707f89ee123a4393e98595a241",
+    "frontend": "sha256:499c38a33bd42ec0a925d06dcde20b500d5ae51115c5286c72a760ef05326291",
+    "authFrontend": "sha256:e105459074e641a445f07e95c4d4113cd8d779bf269e5a56e0d00f9176d25024",
+    "receiver": "sha256:1cdd10dda71900814b6c5b9fd0b7d01427e54254b175ce106617632f7a836d59"
+  },
+  "imageTag": "d3b76453ee9c-jenkins-11",
+  "imageRevisionAndBuildLabelsMatched": true,
+  "baseAndAuthenticationContainerImageIdsMatched": true,
+  "recovery": {
+    "success": true,
+    "firingSecondsFromDrillStart": 79.42,
+    "notificationSecondsFromDrillStart": 84.77,
+    "resolvedNotificationSecondsFromDrillStart": 114.55,
+    "podsPreserved": 100000,
+    "smtpUsed": false
+  },
+  "provenanceComplete": true,
+  "cleanupPassed": true,
+  "remainingCiContainers": 0,
+  "anonymousJenkinsAccessBlocked": true,
+  "consoleCredentialsExposed": false,
+  "githubWorkflowYamlParsed": true,
+  "githubHostedExecutionVerified": false,
+  "cloudDeploymentVerified": false,
+  "originalWorkingTreePrepareRejected": true,
+  "originalHeadWithoutNewCiFilesRejected": true,
+  "notes": [
+    "Fixture contains the current source without secrets/generated files; original HEAD is older.",
+    "Final documentation/results were updated after this fixture commit; runtime and CI source were not changed.",
+    "This proves commit/image/runtime correspondence, not byte-identical or signed supply-chain builds.",
+    "Recovery times include scrape/evaluation/notification waits and are not an operational SLA."
+  ]
+}

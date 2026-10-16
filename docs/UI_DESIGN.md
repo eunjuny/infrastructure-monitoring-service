@@ -2,6 +2,10 @@
 
 기준일: 2026-10-14. 기존 API·DB와 계층 모델을 유지하고 탐색·조회 화면을 개선했습니다. 새 UI 라이브러리나 유료 서비스를 추가하지 않았습니다.
 
+후속 확장에서는 조회 범위 선택·상세 변경 이력·운영 관측을 실제 API와 함께 추가했습니다. 초기 레이아웃 개선과 달리 이 확장은 V3 이력 테이블과 Prometheus API도 포함합니다. 리소스 탐색과 운영 관측을 상단 메뉴로 구분하고, 지표는 서비스의 실제 수집값으로만 표시합니다. [최신 동작과 검증](OPERATIONS_AND_DELIVERY.md)을 참고합니다.
+
+초기 성능 개선에서는 정보·기능·색상·아이콘을 유지하고 상세/운영/이력 코드를 선택 시 로드하도록 분리했습니다. 날짜는 로컬 24시간 숫자 형식, 건수는 정수 쉼표 형식이며 기본 폰트는 Arial·Apple SD Gothic Neo·Malgun Gothic입니다. 외부 폰트나 새로운 UI OSS는 추가하지 않았습니다. 닫힌 조회 범위 옵션은 DOM을 만들지 않습니다. [동일 조건의 60회 측정·11개 실제 브라우저 회귀 검증](STARTUP_PERFORMANCE.md)을 참고합니다.
+
 ## 확인한 참고 화면과 문서
 
 - [Headlamp Projects](https://headlamp.dev/docs/latest/learn/projects/): 공식 문서의 Project Resources·Overview 화면에서 좌측 탐색, 자원 종류 구분, 상태·Namespace 등 열 중심 목록과 개요·관계 탭을 확인했습니다.
