@@ -71,6 +71,8 @@ Jenkins 호스트 agent는 Docker/사용자 권한이 있으므로 불특정 외
 
 ## 검증과 한계
 
+2026-10-16 사용자 승인으로 원본 안정화 버전도 기능·CI·문서로 분리 커밋하고 기존 초기 원격 이력을 tree 변경 없이 보존해 비공개 main에 게시했습니다. WH-028에 실제 반영 커밋을 기록합니다. 아래 빌드 15는 동일 실행 소스의 fixture SHA를 검증한 결과이며, 게시한 원본 SHA에서 전체 CI를 다시 돌렸다고 주장하지 않습니다. 추가 Git attribute는 Windows Wrapper CRLF 보존용이며 실행/테스트/CI 본문은 동일합니다. 원격 SCM/webhook 자동 실행은 아직 별도입니다.
+
 2026-10-16 최신 실행은 **Jenkins 빌드 15 SUCCESS**입니다. 공개 Docker 설정 격리·Desktop socket 매핑을 포함한 fixture 커밋의 새 체크아웃에서 오프라인 46·서버 107(실제 PostgreSQL 44)·프론트 77·기본 브라우저 11·실제 Keycloak 5·규칙 9시나리오·실제 복구·8단계·정리를 통과했습니다. 이미지 4개의 SHA/build label·실행 Image ID·소스 tree·JUnit 112와 CI 컨테이너/임시 설정 잔존 0을 확인했습니다. 전역 Docker 설정·기존 컨테이너 18개를 보존했고 전체 Docker 재시작은 하지 않았습니다. [최신 근거](verification/2026-10-16-public-image-ci.json)를 참고합니다.
 
 이전 빌드 13은 빠른 검사 39·서버 107·프론트 77을 통과했지만 이미지 단계 도우미 대기로 `ABORTED`·정리 완료였습니다. [당시 근거](verification/2026-10-16-ci-retry.json)를 보존합니다. 첫 격리 빌드 14는 Ryuk의 host/VM socket 경로 차이로 실패했고, socket 매핑을 보완한 빌드 15가 최종 성공입니다. 개인 도우미 자체 수리·원격 SCM·controller 신규 bootstrap·수동 성능까지 완료했다고 주장하지 않습니다.
