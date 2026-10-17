@@ -1,0 +1,83 @@
+{
+  "date": "2026-10-18",
+  "scope": "Resource detail diagnostics, additive V4 migration and authenticated local deployment",
+  "dataSource": "Mock scenarios and real PostgreSQL scoped aggregates; not live Kubernetes",
+  "backend": {
+    "command": "./backend/gradlew -p backend --no-daemon --console=plain test bootJar",
+    "tests": 140,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "realPostgreSQLCoverage": [
+      "V3 to V4 migration preserves existing state",
+      "Fresh 150000-Pod seed and complete descendant aggregates",
+      "Empty namespace returns zero; missing resource returns 404",
+      "JWT/JWKS and Cluster ownership apply to diagnostics",
+      "Current status determines consistent Mock diagnostics",
+      "SQL budgets: Cluster detail 3, other detail 2, path 1; entity loading 0"
+    ]
+  },
+  "frontend": {
+    "command": "npm test -- --run && npm run build",
+    "tests": 95,
+    "testFiles": 13,
+    "typeCheckAndProductionBuild": "passed",
+    "coverage": ["Four resource types", "Missing values versus zero", "Unit conversion", "Safe text rendering"]
+  },
+  "realAuthenticationE2E": {
+    "command": "python3 scripts/test-auth.py",
+    "expected": 14,
+    "unexpected": 0,
+    "skipped": 0,
+    "flaky": 0,
+    "durationMs": 14867.059,
+    "diagnosticsViewports": [1440, 390],
+    "fourTypesMatchActualApiResponse": true,
+    "horizontalOverflow": false,
+    "credentialsTokensAndAuthTracesRetained": false
+  },
+  "localAuthDeployment": {
+    "webPort": 5176,
+    "rebuiltAndReplacedServices": ["backend", "frontend"],
+    "postgresqlServers": 1,
+    "persistentRunningServices": 7,
+    "monitoringFlywayVersion": 4,
+    "privateDatabaseBackupRetained": true,
+    "oldImageReferencesRetainedPrivately": true,
+    "oldColumnCountAndContentDigestsUnchangedImmediatelyAfterMigration": {
+      "cluster": true,
+      "node": true,
+      "namespace": true,
+      "pod": true,
+      "history": true
+    },
+    "podCount": 150000,
+    "invalidNewMetadataRows": 0,
+    "identityDatabaseAndUsersReinitialized": false,
+    "uiHttp": 200,
+    "authConfigurationHttp": 200,
+    "unauthenticatedResourceApiHttp": 401,
+    "otherEnvironmentsRedeployed": false
+  },
+  "readOnlyAggregateProbe": {
+    "method": "One EXPLAIN ANALYZE BUFFERS sample per aggregate on the running auth DB; not HTTP/browser SLA",
+    "clusterPodAggregate": {
+      "executionMs": 11.367,
+      "indexes": ["idx_node_parent_id", "idx_pod_parent_status_id"]
+    },
+    "namespacePodAggregate": {
+      "executionMs": 0.172,
+      "indexes": ["idx_pod_parent_status_id"]
+    }
+  },
+  "notRun": ["New full Jenkins run", "New CPU4x/cache-off browser performance campaign", "Chrome FPS meter", "External SMTP delivery"],
+  "finalChecks": {
+    "offlineRegressionTests": 71,
+    "qualityGateTextFiles": 231,
+    "qualityGate": "passed",
+    "gitDiffCheck": "passed",
+    "authComposeConfigQuiet": "passed"
+  },
+  "paidAiCalls": 0,
+  "gitCommitOrPush": false
+}

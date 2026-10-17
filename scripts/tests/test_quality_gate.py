@@ -1,6 +1,7 @@
 """Regression tests for the guardrail itself; no Docker, network or application DB."""
 
 from pathlib import Path
+import base64
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 import subprocess
@@ -9,7 +10,7 @@ from tempfile import TemporaryDirectory
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from quality_gate import REQUIRED, check_files, check_wrapper, run
+from quality_gate import MAX_DOCUMENT_IMAGE_BYTES, REQUIRED, check_files, check_wrapper, run
 
 
 class QualityGateTest(unittest.TestCase):
@@ -111,6 +112,63 @@ class GitBoundaryTest(unittest.TestCase):
         with redirect_stdout(output), redirect_stderr(output):
             result = run(self.root)
         return result, output.getvalue()
+
+    def image_fixture(self, path="docs/images/capture.png"):
+        target = self.root / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(base64.b64decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j3f8AAAAASUVORK5CYII="))
+        return target
+
+    def test_document_image_links_accept_bounded_png_without_utf8_decoding(self):
+        self.image_fixture()
+        self.write("README.md", "![Capture](docs/images/capture.png)\n")
+        self.write("docs/PROJECT_GUIDE.md", "[Capture](images/capture.png)\n")
+        result, output = self.invoke()
+        self.assertEqual(0, result, output)
+
+    def test_missing_image_still_fails_local_link_check(self):
+        self.write("README.md", "![Missing](docs/images/missing.png)\n")
+        result, output = self.invoke()
+        self.assertEqual(1, result)
+        self.assertIn("local-document-link: README.md", output)
+
+    def test_invalid_image_signature_and_extension_mismatch_are_rejected(self):
+        for content in [b"not a JPEG image at all\n", self.image_fixture().read_bytes()]:
+            with self.subTest(signature=content[:4]):
+                target = self.root / "docs/images/capture.jpg"
+                target.write_bytes(content)
+                self.write("README.md", "![Capture](docs/images/capture.jpg)\n")
+                result, output = self.invoke()
+                self.assertEqual(1, result)
+                self.assertIn("document-image-format: docs/images/capture.jpg", output)
+
+    def test_oversized_document_image_is_rejected(self):
+        target = self.image_fixture()
+        with target.open("r+b") as image:
+            image.truncate(MAX_DOCUMENT_IMAGE_BYTES + 1)
+        result, output = self.invoke()
+        self.assertEqual(1, result)
+        self.assertIn("document-image-format: docs/images/capture.png", output)
+
+    def test_ignored_and_out_of_scope_images_do_not_bypass_link_validation(self):
+        for path in [".local/capture.png", "frontend/capture.png"]:
+            with self.subTest(path=path):
+                self.image_fixture(path)
+                self.write("README.md", f"![Capture]({path})\n")
+                result, output = self.invoke()
+                self.assertEqual(1, result)
+                self.assertIn("local-document-link: README.md", output)
+
+    def test_image_symlink_cannot_read_excluded_files(self):
+        secret = self.image_fixture(".local/private.png")
+        target = self.root / "docs/images/capture.png"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.symlink_to(secret)
+        self.write("README.md", "![Capture](docs/images/capture.png)\n")
+        result, output = self.invoke()
+        self.assertEqual(1, result)
+        self.assertIn("document-image-format: docs/images/capture.png", output)
 
     def test_untracked_next_migration_allowed_and_ignored_secret_not_read(self):
         self.write("backend/src/main/resources/db/migration/V2__next.sql", "select 2;\n")

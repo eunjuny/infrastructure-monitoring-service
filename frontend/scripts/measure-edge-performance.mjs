@@ -19,7 +19,7 @@ await session.send('Emulation.setCPUThrottlingRate', { rate: 4 })
 await session.send('Performance.enable')
 const environment = { date: new Date().toISOString(), cpu: os.cpus()[0]?.model, physicalMemory: os.totalmem(),
   browser: browser.version(), node: process.version, cpuThrottle: 4, cacheDisabled: true, networkThrottle: 'none', headless: true,
-  viewport: { width: 1440, height: 1000 }, repetitions, database: { clusters: 20, nodes: 200, namespaces: 2000, pods: 100000 } }
+  viewport: { width: 1440, height: 1000 }, repetitions, database: { clusters: 20, nodes: 200, namespaces: 2000, pods: 150000 } }
 const records = [], errors = [], memory = [], invariants = []
 let originalPod, lastMutation, restoration = 'not-needed'
 

@@ -61,7 +61,7 @@ class MockStateIntegrationTest {
     @Test void onlyBoundedRowsChangeAndReadAPIsSeeCommittedValues() throws Exception {
         var result = service(repository).advance();
         assertEquals(100, result.changed().get(ResourceType.POD));
-        assertEquals(100000, jdbc.queryForObject("select count(*) from infrastructure_pod", Integer.class));
+        assertEquals(150000, jdbc.queryForObject("select count(*) from infrastructure_pod", Integer.class));
         assertEquals("NORMAL", jdbc.queryForObject("select status from infrastructure_pod where id=101", String.class));
         mvc.perform(get("/api/resources/POD/1"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.resource.status").value("WARNING"))

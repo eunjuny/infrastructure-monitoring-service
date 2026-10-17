@@ -3,49 +3,54 @@ services:
   db:
     image: postgres:17-alpine
     environment:
-      POSTGRES_DB: monitoring
-      POSTGRES_USER: monitoring
-      POSTGRES_PASSWORD: ${AUTH_APP_DB_PASSWORD:?Run scripts/auth-local.py first}
-    volumes: [auth-data:/var/lib/postgresql/data]
+      POSTGRES_DB: postgres
+      POSTGRES_USER: infrastructure_admin
+      POSTGRES_PASSWORD: ${AUTH_DB_ADMIN_PASSWORD:?Run scripts/auth-local.py first}
+    volumes: [auth-shared-data:/var/lib/postgresql/data]
     healthcheck:
-      test: [CMD-SHELL, 'pg_isready -U monitoring -d monitoring']
+      test: [CMD-SHELL, 'pg_isready -U infrastructure_admin -d postgres']
       interval: 5s
       timeout: 3s
       retries: 30
-  keycloak-db:
+  db-init:
     image: postgres:17-alpine
     environment:
-      POSTGRES_DB: identity
-      POSTGRES_USER: identity
-      POSTGRES_PASSWORD: ${AUTH_IDENTITY_DB_PASSWORD:?Run scripts/auth-local.py first}
-    volumes: [identity-data:/var/lib/postgresql/data]
-    healthcheck:
-      test: [CMD-SHELL, 'pg_isready -U identity -d identity']
-      interval: 5s
-      timeout: 3s
-      retries: 30
+      PGHOST: db
+      PGUSER: infrastructure_admin
+      PGDATABASE: postgres
+      PGPASSWORD: ${AUTH_DB_ADMIN_PASSWORD:?Run scripts/auth-local.py first}
+      AUTH_APP_DB_PASSWORD: ${AUTH_APP_DB_PASSWORD:?Run scripts/auth-local.py first}
+      AUTH_IDENTITY_DB_PASSWORD: ${AUTH_IDENTITY_DB_PASSWORD:?Run scripts/auth-local.py first}
+    volumes: ['./infra/postgres/init-auth-databases.sh:/init-databases.sh:ro']
+    command: [sh, /init-databases.sh]
+    depends_on:
+      db: {condition: service_healthy}
   auth-import:
     image: alpine:3.22
     user: '0:0'
     volumes:
       - ${AUTH_REALM_FILE:-./.local/auth/realm.json}:/source/realm.json:ro
       - realm-import:/import
-    command: [sh, -c, 'cp /source/realm.json /import/infrastructure-monitoring-realm.json && chown 1000:0 /import/infrastructure-monitoring-realm.json && chmod 600 /import/infrastructure-monitoring-realm.json']
+      - ${AUTH_SMTP_FILE:-./.local/auth/smtp.json}:/source/smtp.json:ro
+      - email-secrets:/email-secrets
+    command: [sh, -c, 'cp /source/realm.json /import/infrastructure-monitoring-realm.json && chown 1000:0 /import/infrastructure-monitoring-realm.json && chmod 600 /import/infrastructure-monitoring-realm.json && cp /source/smtp.json /email-secrets/smtp.json && chown 65534:65534 /email-secrets/smtp.json && chmod 600 /email-secrets/smtp.json']
   keycloak:
     image: quay.io/keycloak/keycloak:26.8.1
     command: [start-dev, --import-realm, '--hostname=http://127.0.0.1:${AUTH_KEYCLOAK_PORT:-8183}']
     environment:
       KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://keycloak-db:5432/identity
+      KC_DB_URL: jdbc:postgresql://db:5432/identity
       KC_DB_USERNAME: identity
       KC_DB_PASSWORD: ${AUTH_IDENTITY_DB_PASSWORD:?Run scripts/auth-local.py first}
       KC_BOOTSTRAP_ADMIN_USERNAME: kc-bootstrap
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${AUTH_BOOTSTRAP_PASSWORD:?Run scripts/auth-local.py first}
       KC_HEALTH_ENABLED: 'true'
     ports: ['127.0.0.1:${AUTH_KEYCLOAK_PORT:-8183}:8080']
-    volumes: [realm-import:/opt/keycloak/data/import:ro]
+    volumes:
+      - realm-import:/opt/keycloak/data/import:ro
+      - ./infra/keycloak/themes/infra-monitor:/opt/keycloak/themes/infra-monitor:ro
     depends_on:
-      keycloak-db: {condition: service_healthy}
+      db-init: {condition: service_completed_successfully}
       auth-import: {condition: service_completed_successfully}
   backend:
     build: {context: ., dockerfile: backend/Dockerfile}
@@ -60,9 +65,12 @@ services:
       SPRING_PROFILES_ACTIVE: mock
       MONITORING_AUTH_ISSUER: http://127.0.0.1:${AUTH_KEYCLOAK_PORT:-8183}/realms/infrastructure-monitoring
       MONITORING_AUTH_JWK_SET_URI: http://keycloak:8080/realms/infrastructure-monitoring/protocol/openid-connect/certs
+      ALERT_EMAIL_CONTROL_TOKEN: ${ALERT_EMAIL_CONTROL_TOKEN:?Run scripts/auth-local.py first}
+      ALERT_EMAIL_URL: http://alert-receiver:8090
     ports: ['127.0.0.1:${AUTH_API_PORT:-8083}:8081']
     depends_on:
       db: {condition: service_healthy}
+      db-init: {condition: service_completed_successfully}
       keycloak: {condition: service_started}
     healthcheck:
       test: [CMD, curl, --fail, --silent, 'http://localhost:8086/actuator/health']
@@ -98,21 +106,38 @@ services:
       backend: {condition: service_healthy}
   alertmanager:
     image: prom/alertmanager:v0.34.0
+    labels: {io.infrastructure.smtp-revision: '${AUTH_SMTP_REVISION:-initial}'}
     ports: ['127.0.0.1:${AUTH_ALERTMANAGER_PORT:-9195}:9093']
     volumes:
-      - ./infra/alertmanager/alertmanager.yaml:/etc/alertmanager/alertmanager.yml:ro
+      - email-config:/var/lib/alert-email:ro
       - auth-alertmanager:/alertmanager
-    command: ['--config.file=/etc/alertmanager/alertmanager.yml', '--storage.path=/alertmanager', '--data.retention=24h', '--cluster.listen-address=']
-    depends_on: [alert-receiver]
+    command: ['--config.file=/var/lib/alert-email/alertmanager.yml', '--storage.path=/alertmanager', '--data.retention=24h', '--cluster.listen-address=']
+    depends_on:
+      alert-receiver: {condition: service_healthy}
   alert-receiver:
     build: {context: ., dockerfile: infra/alertmanager/Dockerfile}
+    labels: {io.infrastructure.smtp-revision: '${AUTH_SMTP_REVISION:-initial}'}
+    environment:
+      ALERT_EMAIL_CONTROL_TOKEN: ${ALERT_EMAIL_CONTROL_TOKEN:?Run scripts/auth-local.py first}
+      ALERT_EMAIL_SMTP_FILE: /run/email-secrets/smtp.json
+    volumes:
+      - email-secrets:/run/email-secrets:ro
+      - email-config:/var/lib/alert-email
+    depends_on:
+      auth-import: {condition: service_completed_successfully}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/health',timeout=2)"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
     mem_limit: 64m
     read_only: true
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
 volumes:
-  auth-data:
-  identity-data:
+  auth-shared-data:
   realm-import:
   auth-prometheus:
   auth-alertmanager:
+  email-config:
+  email-secrets:

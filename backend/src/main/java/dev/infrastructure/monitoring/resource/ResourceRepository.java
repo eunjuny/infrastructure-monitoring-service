@@ -50,6 +50,46 @@ public class ResourceRepository {
                 .setParameter("id", id).setMaxResults(1).getResultList().stream().findFirst().map(value -> value.row(type));
     }
 
+    /** Detail-only scalar queries; every aggregate retains the server's Cluster scope. */
+    public Map<String, Object> diagnostics(Item resource) {
+        ResourceType type = resource.type();
+        long id = resource.id();
+        return switch (type) {
+            case CLUSTER -> {
+                var nodes = diagnosticRow("select count(r.id), coalesce(sum(case when r.status <> 'ERROR' then 1 else 0 end),0)"
+                        + " from NodeResource r where r.cluster.id = :id" + accessWhere(ResourceType.NODE), id);
+                var pods = podCounts("r.namespace.node.cluster.id = :id", id);
+                yield Map.of("nodeCount", nodes[0], "readyNodeCount", nodes[1],
+                        "podCount", pods[0], "problemPodCount", pods[2]);
+            }
+            case NAMESPACE -> {
+                var pods = podCounts("r.namespace.id = :id", id);
+                yield Map.of("podCount", pods[0], "errorPodCount", pods[1], "notReadyPodCount", pods[2]);
+            }
+            case NODE -> {
+                var node = diagnosticRow("select r.cpuCapacityCores, r.memoryCapacityMiB from NodeResource r"
+                        + " where r.id = :id" + accessWhere(type), id);
+                yield MockDiagnostics.node(resource.status(), id, (Number) node[0], (Number) node[1]);
+            }
+            case POD -> {
+                var pod = diagnosticRow("select r.containerCount, r.image, r.workloadKind, r.workloadName"
+                        + " from PodResource r where r.id = :id" + accessWhere(type), id);
+                yield MockDiagnostics.pod(resource.status(), id, ((Number) pod[0]).intValue(),
+                        (String) pod[1], (String) pod[2], (String) pod[3]);
+            }
+        };
+    }
+
+    private Object[] podCounts(String scope, long id) {
+        return diagnosticRow("select count(r.id), coalesce(sum(case when r.status = 'ERROR' then 1 else 0 end),0),"
+                + " coalesce(sum(case when r.status <> 'NORMAL' then 1 else 0 end),0) from PodResource r where "
+                + scope + accessWhere(ResourceType.POD), id);
+    }
+
+    private Object[] diagnosticRow(String hql, long id) {
+        return access.bind(query(hql, Object[].class)).setParameter("id", id).getSingleResult();
+    }
+
     public List<Row> list(ResourceQuery request, ResourceCursorCodec.Position position) {
         return fetch(request, request.type(), position, request.limit() + 1);
     }

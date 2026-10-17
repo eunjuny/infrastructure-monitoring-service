@@ -10,6 +10,8 @@ public class NodeResource extends BaseResource {
     @JoinColumn(name = "cluster_id", nullable = false) private ClusterResource cluster;
     @Column(name = "cpu_usage", nullable = false, precision = 5, scale = 2) private BigDecimal cpuUsage;
     @Column(name = "memory_usage", nullable = false, precision = 5, scale = 2) private BigDecimal memoryUsage;
+    @Column(name = "cpu_capacity_cores", nullable = false) private int cpuCapacityCores;
+    @Column(name = "memory_capacity_mib", nullable = false) private long memoryCapacityMiB;
 
     protected NodeResource() { }
 }

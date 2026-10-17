@@ -40,7 +40,7 @@ public class ResourceController {
 
     @GetMapping("/{type}/{id}")
     public Detail detail(@PathVariable String type, @PathVariable long id) {
-        return service.detail(ResourceType.parse(type), id);
+        return service.detailWithDiagnostics(ResourceType.parse(type), id);
     }
 
     @GetMapping("/{type}/{id}/children")

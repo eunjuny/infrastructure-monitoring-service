@@ -1,5 +1,6 @@
 package dev.infrastructure.monitoring.resource;
 
+import dev.infrastructure.monitoring.history.ResourceHistoryService;
 import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.FetchType;
@@ -45,6 +46,7 @@ class JpaQueryIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired ResourceRepository repository;
     @Autowired ResourceService service;
+    @Autowired ResourceHistoryService history;
     @Autowired EntityManagerFactory factory;
     @Autowired EntityManager entityManager;
     @Autowired PlatformTransactionManager transactions;
@@ -80,7 +82,7 @@ class JpaQueryIntegrationTest {
 
     @Test void validatedScopeHasFixedQueryCountRegardlessOfResultSize() {
         var result = service.list(ResourceQuery.list("POD", null, "", null, 100, null, 2L, 101L));
-        assertEquals(50, result.items().size());
+        assertEquals(100, result.items().size());
         assertEquals(3, statistics.getPrepareStatementCount());
         assertTrue(result.items().stream().allMatch(item -> item.parent().id() == 101));
         assertNoEntityGraph();
@@ -95,11 +97,34 @@ class JpaQueryIntegrationTest {
         assertNoEntityGraph();
     }
 
+    @Test void historyKeepsAccessCheckAndEventReadToTwoProjectionQueries() {
+        var page = history.list("POD", 1, 100, null);
+
+        assertTrue(page.items().size() <= 100);
+        assertEquals(2, statistics.getPrepareStatementCount());
+        assertEquals(2, statistics.getQueryExecutionCount());
+        assertNoEntityGraph();
+    }
+
+    @Test void diagnosticsAreDetailOnlyAndUseBoundedScalarQueryCounts() {
+        var cluster = service.detailWithDiagnostics(ResourceType.CLUSTER, 1);
+        assertEquals(10000L, cluster.attributes().get("podCount"));
+        assertEquals(3, statistics.getPrepareStatementCount());
+        assertNoEntityGraph();
+        statistics.clear();
+        service.detailWithDiagnostics(ResourceType.POD, 1);
+        assertEquals(2, statistics.getPrepareStatementCount());
+        assertNoEntityGraph();
+        statistics.clear();
+        service.path(ResourceType.POD, 1);
+        assertEquals(1, statistics.getPrepareStatementCount());
+    }
+
     @Test void flywaySchemaIsMappedAndJpaOwnsTransactions() {
         assertInstanceOf(JpaTransactionManager.class, transactions);
         assertEquals(5, factory.getMetamodel().getEntities().size());
-        assertEquals(3, jdbc.queryForObject("select max(version::integer) from flyway_schema_history where success", Integer.class));
-        assertEquals(100000, jdbc.queryForObject("select count(*) from infrastructure_pod", Integer.class));
+        assertEquals(4, jdbc.queryForObject("select max(version::integer) from flyway_schema_history where success", Integer.class));
+        assertEquals(150000, jdbc.queryForObject("select count(*) from infrastructure_pod", Integer.class));
     }
 
     @Test void ancestorMappingsAreLazyAndCollectionFetchPaginationIsBlocked() throws Exception {

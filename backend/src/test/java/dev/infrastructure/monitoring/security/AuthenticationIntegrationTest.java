@@ -114,17 +114,31 @@ class AuthenticationIntegrationTest {
         String admin = token("subject-admin", "ADMIN", List.of());
         mvc.perform(get("/api/resources/summary").header(HttpHeaders.AUTHORIZATION, "Bearer " + admin))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.clusters").value(20))
-                .andExpect(jsonPath("$.pods").value(100000));
+                .andExpect(jsonPath("$.pods").value(150000));
         mvc.perform(get("/api/resources/POD/50001").header(HttpHeaders.AUTHORIZATION, "Bearer " + admin))
                 .andExpect(status().isOk());
     }
-    @Test void eachViewerHasHalfTheCountsAndDisjointClusterLists() throws Exception {
+
+    @Test void diagnosticAggregatesKeepTheSameClusterOwnershipBoundary() throws Exception {
+        String first = "Bearer " + viewer(true);
+        String second = "Bearer " + viewer(false);
+        mvc.perform(get("/api/resources/CLUSTER/1").header(HttpHeaders.AUTHORIZATION, first))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.attributes.podCount").value(10000));
+        mvc.perform(get("/api/resources/CLUSTER/11").header(HttpHeaders.AUTHORIZATION, second))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.attributes.podCount").value(5000));
+        mvc.perform(get("/api/resources/NAMESPACE/1").header(HttpHeaders.AUTHORIZATION, first))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.attributes.podCount").value(100));
+        mvc.perform(get("/api/resources/CLUSTER/11").header(HttpHeaders.AUTHORIZATION, first)).andExpect(status().isNotFound());
+        mvc.perform(get("/api/resources/NAMESPACE/1").header(HttpHeaders.AUTHORIZATION, second)).andExpect(status().isNotFound());
+        mvc.perform(get("/api/resources/POD/50001").header(HttpHeaders.AUTHORIZATION, first)).andExpect(status().isNotFound());
+    }
+    @Test void eachViewerHasItsAssignedCountsAndDisjointClusterLists() throws Exception {
         for (boolean a : List.of(true, false)) {
             String bearer = "Bearer " + viewer(a);
             mvc.perform(get("/api/resources/summary").header(HttpHeaders.AUTHORIZATION, bearer))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.clusters").value(10))
                     .andExpect(jsonPath("$.nodes").value(100)).andExpect(jsonPath("$.namespaces").value(1000))
-                    .andExpect(jsonPath("$.pods").value(50000));
+                    .andExpect(jsonPath("$.pods").value(a ? 100000 : 50000));
             mvc.perform(get("/api/resources").header(HttpHeaders.AUTHORIZATION, bearer))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(10))
                     .andExpect(jsonPath("$.items[0].id").value(a ? 1 : 11))
@@ -145,6 +159,21 @@ class AuthenticationIntegrationTest {
                     .header(HttpHeaders.AUTHORIZATION, bearer)).andExpect(status().isNotFound());
         }
     }
+
+    @Test void appendedIdsFollowClusterAssignmentsRatherThanOldNumericHalfRanges() throws Exception {
+        for (boolean a : List.of(true, false)) {
+            String bearer = "Bearer " + viewer(a);
+            long own = a ? 150000 : 50001;
+            long other = a ? 50001 : 150000;
+            mvc.perform(get("/api/resources/POD/" + own).header(HttpHeaders.AUTHORIZATION, bearer))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.path[0].id").value(a ? 10 : 11));
+            mvc.perform(get("/api/resources/POD/" + other).header(HttpHeaders.AUTHORIZATION, bearer))
+                    .andExpect(status().isNotFound());
+            mvc.perform(get("/api/resources/POD/" + other + "/events").header(HttpHeaders.AUTHORIZATION, bearer))
+                    .andExpect(status().isNotFound());
+        }
+    }
     @Test void globalSearchIsScopedAndCursorCannotCrossUsers() throws Exception {
         mvc.perform(get("/api/resources/search?q=cluster-&type=CLUSTER").header(HttpHeaders.AUTHORIZATION, "Bearer " + viewer(false)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(10))
@@ -156,6 +185,12 @@ class AuthenticationIntegrationTest {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + viewer(false))).andExpect(status().isBadRequest());
     }
     @Test void operationsRequiresAdministratorAndNamesDoNotGrantIt() throws Exception {
+        mvc.perform(get("/api/operations/alert-email")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/operations/alert-email").header(HttpHeaders.AUTHORIZATION, "Bearer " + viewer(true)))
+                .andExpect(status().isForbidden());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/operations/alert-email")
+                .contentType("application/json").content("{\"recipient\":\"admin@example.invalid\",\"enabled\":false}")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + viewer(false))).andExpect(status().isForbidden());
         mvc.perform(get("/api/operations/alerts").header(HttpHeaders.AUTHORIZATION, "Bearer " + viewer(true)))
                 .andExpect(status().isForbidden());
         mvc.perform(get("/api/operations/alerts")).andExpect(status().isUnauthorized());

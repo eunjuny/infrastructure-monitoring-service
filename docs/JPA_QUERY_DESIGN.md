@@ -2,6 +2,8 @@
 
 ## 전환 목적과 범위
 
+2026-10-18 진단 확장에서는 V4 정적 메타데이터를 매핑하고, 상세 전용 HQL scalar 집계/조회만 추가합니다. 목록 projection/SQL 1회·Entity 로딩 0은 유지하고 Cluster 진단 3회·나머지 진단 2회·path 1회·이력 2회로 제한합니다. 권한 조건은 새 쿼리에도 바인딩하며 REPEATABLE_READ 상세 snapshot에서 상태/집계를 읽습니다. [정의·API·이행·검증](RESOURCE_DIAGNOSTICS.md)을 참고하고 아래 V1~V3 유지 설명은 원래 JPA 전환 당시 기록입니다.
+
 과제 가이드는 백엔드 기술을 제한하지 않습니다. 채용공고의 JPA/Hibernate 활용·성능 고려 요구와 사용자 요청에 맞춰 기존 JDBC 구현을 **JPA/Hibernate Entity 매핑 + DTO projection**으로 전환했습니다. JPA가 JDBC보다 빠르다는 주장이나 실무 운영 경험의 대체가 아닙니다.
 
 애플리케이션의 목록·검색·상세·경로·건수·이력 조회는 EntityManager로 실행합니다. `JdbcTemplate`은 실제 DB 테스트의 독립 검증·fixture 적재에서만 사용합니다. 기존 API와 화면, Flyway V1~V3, 데이터와 인덱스는 유지했습니다. 새 테이블을 만들거나 기존 데이터를 재생성·삭제하지 않습니다.
@@ -50,20 +52,23 @@ Mock의 제한 행 잠금·상태/속성 갱신·변경 전후 이력 INSERT는 
 
 ## 검증 근거
 
-`JpaQueryIntegrationTest`는 실제 PostgreSQL 17의 10만 Pod에서 다음을 확인합니다.
+`JpaQueryIntegrationTest`는 현재 실제 PostgreSQL 17의 15만 Pod에서 다음을 확인합니다. 2026-10-17에 seed·기대 건수를 확장했으며 아래 과거 JPA 전환/성능 결과는 당시 10만 건 기록으로 유지합니다.
 
 | 검사 | 기대 결과 |
 |---|---|
 | Pod 목록 | SQL 1회, 최대 101개 반환, Entity load/fetch·collection fetch 0 |
 | 전체 유형에서 `pod` 검색 | SQL 4회, 합산 101개, Entity 그래프 로딩 0 |
-| Cluster·Namespace 범위 | 존재/소속 검증 포함 SQL 3회, Namespace 아래 50개 반환 |
+| Cluster·Namespace 범위 | 존재/소속 검증 포함 SQL 3회, 앞쪽 Namespace 아래 100개 반환. 뒤쪽은 50개 |
 | Pod 상세·4단계 경로 | SQL 1회, 트랜잭션 종료 후 DTO 사용, Entity 로딩 0 |
+| 변경 이력 서비스 | 리소스 존재·Cluster 접근 확인 1회 + 이력 projection 1회, 최대 101개 내부 조회·100개 반환, Entity 그래프 로딩 0 |
 | Entity·트랜잭션 | 5개 Entity 매핑, JpaTransactionManager, Flyway V1~V3 유지 |
 | 관계 정책 | 부모 LAZY 및 collection fetch pagination 차단 |
 | 실제 생성 SQL 실행 계획 | 선택적 이름 검색에서 `idx_pod_name_trgm` 사용 |
 | timeout | PostgreSQL `pg_sleep(3)`이 JPA 1초 timeout hint로 취소 |
 
 Hibernate Statistics와 StatementInspector는 이 통합 테스트에서만 켭니다. 운영 요청마다 SQL/통계를 로깅하지 않습니다. 인덱스 사용은 선택적인 특정 검색어에서 검증한 것이며 모든 검색어의 GIN 사용을 보장하지 않습니다. 기존 Mock 커밋·롤백·보관 정리와 API 계약 테스트도 전환 후 재검증합니다. Maven 전체 87개(실제 PostgreSQL 통합 30개 포함)가 실패·오류·skip 없이 통과했습니다. 검증된 Hibernate 버전은 6.6.53.Final입니다.
+
+이력 서비스 검사는 2026-10-17 기능 유지형 리팩터링에서 추가한 후속 회귀입니다. 이력 Controller에서 Service로 옮겨도 기존 `ResourceService.detail`·이력 Repository의 읽기 전용 트랜잭션은 그대로 사용합니다. 페이지 검증을 DB 트랜잭션 밖에 두므로 연결 풀 고갈 시에도 잘못된 `limit`은 400입니다. 유효한 이력 요청은 기존 503 처리와 연결 반환 후 복구를 검사합니다. 위 Maven 87개는 당시 전환 기록이며 후속 실행 결과는 [기준 문서](PROJECT_GUIDE.md), WH-029와 구분합니다.
 
 전체 테스트·Jenkins·브라우저·동일 조건 성능 결과는 [프로젝트 기준 문서](PROJECT_GUIDE.md)에 최신화합니다. 전환 전 성능과 비교할 때 캐시·JIT·DB 상태·동시 로컬 프로세스의 영향을 구분하며 관측 결과만으로 JDBC/JPA 전체의 성능 우열을 주장하지 않습니다.
 

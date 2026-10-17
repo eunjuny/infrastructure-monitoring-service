@@ -19,14 +19,14 @@ JOIN infrastructure_cluster cluster ON cluster.id = node.cluster_id
 WHERE pod.status = 'ERROR'
 ORDER BY pod.id LIMIT 101;
 
-\echo 'Keyset page near the end of 100k rows'
+\echo 'Keyset page near the end of 150k rows'
 EXPLAIN (ANALYZE, BUFFERS)
 SELECT pod.id, pod.name, pod.status, namespace.name, node.name, cluster.name
 FROM infrastructure_pod pod
 JOIN infrastructure_namespace namespace ON namespace.id = pod.namespace_id
 JOIN infrastructure_node node ON node.id = namespace.node_id
 JOIN infrastructure_cluster cluster ON cluster.id = node.cluster_id
-WHERE pod.id > 99000
+WHERE pod.id > 149000
 ORDER BY pod.id LIMIT 101;
 
 \echo 'Short missing substring: a trigram index may not help'

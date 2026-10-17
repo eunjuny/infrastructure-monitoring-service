@@ -35,7 +35,8 @@ CI 실행자는 Jenkins 하나이며 `scripts/ci_pipeline.py`의 단계를 호�
 |---|---|
 | 기준 문서 | AGENTS·README·개발/품질/프로젝트/이력 문서 누락 |
 | 텍스트 기본 형식 | UTF-8 아님, CRLF, 마지막 개행 누락, 코드의 후행 공백 |
-| 문서 링크 | 인라인 상대 파일 링크가 저장소의 검사 대상 텍스트 파일로 연결되지 않음 |
+| 문서 링크 | 인라인 상대 파일 링크가 검사 대상 텍스트 또는 검증된 docs/images 이미지로 연결되지 않음 |
+| 문서 이미지 | docs/images의 JPEG/PNG가 심볼릭 링크·5MiB 초과·형식 시작/종료 바이트 불일치 |
 | 비밀정보 일부 패턴 | 개인키 헤더·일부 GitHub/OpenAI 키 패턴. 값은 출력하지 않음 |
 | 프론트 경계 | src의 api.ts 외 fetch, raw HTML/동적 코드 실행 패턴, TS 검사 무시 지시 |
 | 서버 경계 | 운영 Java의 JdbcTemplate, Controller의 JPA/SQL/Entity 패키지 import |
@@ -44,7 +45,7 @@ CI 실행자는 Jenkins 하나이며 `scripts/ci_pipeline.py`의 단계를 호�
 | Gradle | 공식 Wrapper JAR hash·배포 URL/ZIP checksum 불일치, 필수 설정/잠금 파일 누락, POM과 동시 유지 |
 | Git 공백 | git diff --check 실패 |
 
-파일은 `git ls-files --cached --others --exclude-standard`로 수집합니다. 따라서 현재 미커밋 신규 소스도 검사하고 `.local`·node_modules·target·산출물 등 Git 제외 파일은 읽지 않습니다. 이 도구 자체와 회귀 테스트도 검사 대상입니다. 무시 파일의 시크릿·바이너리·원격 웹·전체 Git 이력은 검사하지 않습니다.
+파일은 `git ls-files --cached --others --exclude-standard`로 수집합니다. 따라서 현재 미커밋 신규 소스도 검사하고 `.local`·node_modules·target·산출물 등 Git 제외 파일은 읽지 않습니다. 이 도구 자체와 회귀 테스트도 검사 대상입니다. 무시 파일의 시크릿·임의 바이너리·원격 웹·전체 Git 이력은 검사하지 않습니다. 예외적으로 docs/images의 .jpg/.jpeg/.png는 파일 크기·시작/종료 바이트만 읽어 문서 링크 대상으로 검증하며, 파일/상위 경로의 심볼릭 링크는 따라가지 않습니다. 첫 실제 Performance 패널 이미지 첨부를 위한 지원이며 문서 링크 검사를 끄거나 모든 바이너리 파일을 허용하지 않습니다.
 
 Gradle의 kts/properties/lockfile/Unix Wrapper도 텍스트 검사에 포함합니다. 공식 Wrapper JAR는 별도 SHA-256 검사로 예외적으로 읽습니다. Windows 생성 스크립트의 공식 CRLF는 유지하며 일반 LF 검사에 포함하지 않습니다. 로컬 Gradle 배포 캐시 전체를 검사하거나 lockfile의 모든 내용까지 이 게이트로 검증하지는 않으며 strict locking 빌드가 의존성 정합성을 확인합니다.
 
@@ -55,7 +56,7 @@ Windows Wrapper는 `.gitattributes`의 해당 경로에만 `-text`와 `cr-at-eol
 ## 제한과 실패 처리
 
 - 텍스트/정규식 검사입니다. Java/TypeScript AST·타입 검사·보안 감사가 아니며, 별칭/우회·댓글/문자열에 의한 미탐/오탐이 가능합니다.
-- 링크의 파일 존재만 확인합니다. 외부 URL, heading anchor, 참조식 링크와 이미지 바이너리 검증은 포함하지 않습니다. 코드 블록의 예시 링크는 제외합니다.
+- 텍스트 링크는 대상 존재를, 문서 이미지는 제한된 경로·크기·컨테이너 시작/종료 바이트를 확인합니다. 완전한 이미지 디코딩·메타데이터/화면의 개인정보 검출은 아니므로 실제 캡처를 직접 검수해야 합니다. 외부 URL, heading anchor, 참조식 링크는 포함하지 않으며 코드 블록의 예시 링크는 제외합니다.
 - 시크릿 검출은 일부 고확신 패턴뿐입니다. 일반 비밀번호·실사용 이메일·모든 토큰을 자동으로 찾아주지 않으므로 diff 리뷰와 시크릿 저장 규칙이 계속 필요합니다.
 - 기본 JPA 설정 검사는 프로필/환경변수의 모든 재정의를 분석하지 않습니다. Controller가 DTO 대신 Entity를 간접 반환하는지도 이 검사만으로 보장하지 않습니다.
 - 기준 문서의 존재·파일 링크를 검사할 뿐 이력의 새 항목 추가 여부·설계 내용의 정확성·문서와 코드의 의미적 일치는 자동 판정하지 않습니다. AGENTS의 작업 루프와 리뷰로 확인합니다.
@@ -63,6 +64,16 @@ Windows Wrapper는 `.gitattributes`의 해당 경로에만 `-text`와 `cr-at-eol
 - 검사 실패 시 규칙 ID와 파일 경로를 보고 수정합니다. 비밀값을 출력해 원인을 찾지 않습니다. 오탐은 최소 재현 테스트를 추가하고 검사/문서를 함께 고칩니다. 실패를 무시하는 옵션은 제공하지 않습니다.
 
 ## 이번 도입의 검증과 후속 범위
+
+2026-10-18 리소스 진단 추가 후 서버140개·프론트95개·실제 Keycloak E2E14개·타입/빌드를 재검증했습니다. V4/집계/SQL/권한과 1440px/390px 네 유형 상세를 포함하며 [검증 요약](verification/2026-10-18-resource-diagnostics.json)을 참고합니다. 아래 메일 테스트/성능·전체 Jenkins 결과는 각 시점의 별도 기록입니다.
+
+2026-10-18 관리자 경보 메일은 오프라인 6개와 SMTP 파일 변경 시 재생성 회귀1개를 추가해 전체 71개 도구 회귀를 구성합니다. 서버 125개·화면 89개·실제 Keycloak E2E 12개를 실행했고, 별도 `python3 scripts/test-alert-email.py`에서 실제 Alertmanager의 발생/해소 메일을 내부 SMTP sink로 확인했습니다. 이 SMTP 검증은 `fast`에 포함하지 않으며 실제 계정/외부 메일을 사용하지 않습니다. [메일 검증 경계](ALERT_EMAIL.md)를 참고합니다. 성능 목표 판정은 별도 반복 결과를 사용합니다.
+
+2026-10-18 실제 Chrome Performance JPEG를 처음 연결하며, 텍스트 파일만 링크 대상으로 허용하던 제한으로 README/캡처 문서/이력 세 링크가 실패했습니다. 위 문서 이미지 경계를 추가하고 PNG 정상·누락·잘못된 형식/확장자·크기 초과·Git 제외/허용 경로 밖·심볼릭 링크 회귀 6개를 추가했습니다. 기존 소스/시크릿/마이그레이션 검사는 유지합니다. 실제 결과는 WH-038에 기록합니다.
+
+2026-10-18 단일 PostgreSQL 전환에 오프라인 10개를 추가했습니다. 별도 tmpfs PostgreSQL에서 초기화/데이터 보존·TCP 인증·접속/관리자 권한 거부를 검증하고, 로컬 이행 및 새 인증 환경의 실제 Keycloak 테스트를 각각 10개 통과했습니다. [설계·실행 근거](SHARED_AUTH_DATABASE.md)를 참고하며 이전 전체 Jenkins 결과와 구분합니다.
+
+2026-10-17 로컬 회귀는 기존 46개에 Keycloak 테마의 기본 템플릿 상속/읽기 전용 마운트·이전 계정 이름 매핑의 안전한 중단 검사 2개를 추가해 48개입니다. user1/user2 10만/5만 변경 후 서버 120(실제 PostgreSQL 49)·프론트 83·읽기 전용 실제 API 10·실제 Keycloak 8개를 별도 검증했습니다. 새 전체 Jenkins/이미지/성능을 실행한 것은 아니며 아래 빌드 15의 46개 등은 당시 기록으로 유지합니다. [변경·검증 요약](verification/2026-10-17-user-scopes-theme.json), [설계·제약](USER_SCOPES_AND_LOGIN_THEME.md)을 참고합니다.
 
 최신 오프라인 회귀는 기존 39개에 CI Docker 설정 격리/정리·Desktop socket 매핑 7개를 더한 46개입니다. Jenkins 빌드 15의 새 fixture 체크아웃에서 서버 107(실제 PostgreSQL 44)·프론트 77·기본 브라우저 11·실제 Keycloak 5·경보 9시나리오·실제 복구·이미지 추적·정리를 통과했습니다. [최신 실행 근거](verification/2026-10-16-public-image-ci.json)를 참고합니다. 이전 빌드 11과 아래 도입 수치는 당시 이력으로 유지합니다.
 

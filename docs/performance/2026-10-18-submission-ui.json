@@ -1,0 +1,70 @@
+{
+  "date": "2026-10-18",
+  "scope": "Submission UI, real Keycloak ADMIN, read-only performance regression",
+  "environment": {
+    "cpu": "Apple M1 Pro",
+    "memoryBytes": 17179869184,
+    "node": "v22.23.2",
+    "chromium": "156.0.8078.4",
+    "cpuThrottle": 4,
+    "cacheDisabled": true,
+    "networkThrottle": "none",
+    "viewport": { "width": 1440, "height": 1000 },
+    "runtime": "auth-compose-nginx",
+    "dataset": { "clusters": 20, "nodes": 200, "namespaces": 2000, "pods": 150000 }
+  },
+  "functionalChecks": {
+    "vitest": 86,
+    "typecheckAndBuild": "passed",
+    "realKeycloakE2E": { "passed": 10, "skipped": 0, "unexpected": 0, "flaky": 0 },
+    "offlineChecks": 48,
+    "backendJUnitRerun": false
+  },
+  "performanceRuns": [
+    {
+      "label": "submission-ui-20261018",
+      "verifiedIterations": 20,
+      "errors": 0,
+      "exitCode": 1,
+      "measurementOverlap": "Interactive screenshot and viewport verification occurred during this run; effect is not established.",
+      "summary": {
+        "loginSubmit": { "count": 20, "p95": 696.18, "max": 967.03 },
+        "ssoNavigation": { "count": 20, "p95": 595.71, "max": 747.44, "target": 500, "overTarget": 2 },
+        "callbackReady": { "count": 20, "p95": 500.1, "max": 557.4, "target": 500, "overTarget": 2 },
+        "expandCold": { "count": 20, "p95": 143.8, "max": 177.7, "target": 100, "overTarget": 2 },
+        "collapse": { "count": 20, "p95": 29.6, "max": 30, "target": 100, "overTarget": 0 },
+        "expandWarm": { "count": 20, "p95": 29.3, "max": 29.4, "target": 100, "overTarget": 0 },
+        "search": { "count": 20, "p95": 428.2, "max": 744.8, "target": 300, "overTarget": 2 },
+        "filter": { "count": 20, "p95": 63, "max": 64, "target": 200, "overTarget": 0 },
+        "refreshReadOnly": { "count": 20, "p95": 126.8, "max": 288, "target": 200, "overTarget": 1 }
+      }
+    },
+    {
+      "label": "submission-ui-controlled-20261018",
+      "verifiedIterations": 20,
+      "errors": 0,
+      "exitCode": 1,
+      "measurementOverlap": "No further interactive browser capture or image build was performed during this run; existing services continued running.",
+      "summary": {
+        "loginSubmit": { "count": 20, "p95": 775.68, "max": 806.8 },
+        "ssoNavigation": { "count": 20, "p95": 318.8, "max": 480.81, "target": 500, "overTarget": 0 },
+        "callbackReady": { "count": 20, "p95": 254.9, "max": 371.8, "target": 500, "overTarget": 0 },
+        "expandCold": { "count": 20, "p95": 125.1, "max": 161.9, "target": 100, "overTarget": 2 },
+        "collapse": { "count": 20, "p95": 28.4, "max": 30.6, "target": 100, "overTarget": 0 },
+        "expandWarm": { "count": 20, "p95": 30.4, "max": 30.8, "target": 100, "overTarget": 0 },
+        "search": { "count": 20, "p95": 121.3, "max": 514.1, "target": 300, "overTarget": 1 },
+        "filter": { "count": 20, "p95": 69.5, "max": 90.4, "target": 200, "overTarget": 0 },
+        "refreshReadOnly": { "count": 20, "p95": 144.1, "max": 297.5, "target": 200, "overTarget": 1 }
+      }
+    }
+  ],
+  "decision": "Functional UI regression passed; performance acceptance is NOT fully passed.",
+  "limits": [
+    "Previous passing samples were not replaced and failing samples were not discarded.",
+    "The source of latency outliers has not been established.",
+    "No A/B performance comparison of the old and new UI was performed.",
+    "Read-only refresh does not verify propagation of a changed resource value.",
+    "This is not a latest Chrome Performance panel, actual display FPS or Chrome Task Manager memory acceptance result.",
+    "JUnit, full Jenkins, deliberate outage/recovery and the separate runtime image were not rerun or replaced."
+  ]
+}

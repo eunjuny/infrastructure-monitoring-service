@@ -3,6 +3,7 @@ import { defineAsyncComponent, nextTick, ref, watchEffect } from 'vue'
 import { childType, keyOf, type Detail, type Reference, type Resource } from '../api'
 import { fullTimestamp } from '../timestamp'
 import UiIcon from './UiIcon.vue'
+import ResourceDiagnosticsPanel from './ResourceDiagnosticsPanel.vue'
 const ResourceEvents = defineAsyncComponent(() => import('./ResourceEvents.vue'))
 const { selected, detail, busy, error } = defineProps<{ selected: Reference; detail: Detail | null; busy: boolean; error: string }>()
 const emit = defineEmits<{ select: [resource: Reference]; browse: [resource: Resource]; close: []; reveal: [] }>()
@@ -28,7 +29,8 @@ function attributeName(key: string) { return ({ cpuUsage: 'CPU 사용률 (%)', m
       <div class="detail-tabs" role="tablist" aria-label="상세 정보 탭"><button ref="overviewTab" id="overview-tab" role="tab" :tabindex="tab === 'overview' ? 0 : -1" :aria-selected="tab === 'overview'" aria-controls="overview-panel" @click="switchTab('overview')" @keydown.right.prevent="switchTab('path', true)" @keydown.left.prevent="switchTab('path', true)">개요</button><button ref="pathTab" id="path-tab" role="tab" :tabindex="tab === 'path' ? 0 : -1" :aria-selected="tab === 'path'" aria-controls="path-panel" @click="switchTab('path')" @keydown.right.prevent="switchTab('overview', true)" @keydown.left.prevent="switchTab('overview', true)">관계·경로</button></div>
       <div id="overview-panel" role="tabpanel" aria-labelledby="overview-tab" v-show="tab === 'overview'">
         <div v-if="detail.resource.type === 'NODE'" class="metric-bars"><div v-for="metricKey in ['cpuUsage', 'memoryUsage']" :key="metricKey"><div><span>{{ attributeName(metricKey) }}</span><strong>{{ metric(detail.attributes[metricKey]) ?? '—' }}%</strong></div><meter v-if="metric(detail.attributes[metricKey]) !== null" :value="metric(detail.attributes[metricKey])!" min="0" max="100" :aria-label="attributeName(metricKey)" /></div></div>
-        <dl class="attributes"><div><dt>리소스 ID</dt><dd>{{ detail.resource.id }}</dd></div><div><dt>상태 갱신 시각</dt><dd>{{ fullTimestamp(detail.resource.updatedAt) }}</dd></div><div v-for="(value, key) in detail.attributes" :key="key"><dt>{{ attributeName(key) }}</dt><dd>{{ value }}</dd></div></dl>
+        <dl class="attributes"><div><dt>리소스 ID</dt><dd>{{ detail.resource.id }}</dd></div><div><dt>상태 갱신 시각</dt><dd>{{ fullTimestamp(detail.resource.updatedAt) }}</dd></div></dl>
+        <ResourceDiagnosticsPanel :type="detail.resource.type" :attributes="detail.attributes" />
       </div>
       <div id="path-panel" role="tabpanel" aria-labelledby="path-tab" v-show="tab === 'path'">
         <p class="muted">{{ detail.path.length }}단계 경로 · 항목을 선택해 상세로 이동합니다.</p>

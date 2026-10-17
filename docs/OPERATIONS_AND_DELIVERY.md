@@ -6,7 +6,7 @@
 
 ## 1. Cluster / Namespace 범위 필터
 
-전체 10만 Pod에서 이름·상태만 검색하면 다른 클러스터의 동일한 이름도 섞일 수 있습니다. 화면의 `조회 범위`에서 Cluster와 Namespace를 지정하면 해당 범위 안에서 목록·이름 검색·상태 필터를 함께 적용합니다.
+현재 기본 15만 Pod에서 이름·상태만 검색하면 다른 클러스터의 동일한 이름도 섞일 수 있습니다. 화면의 `조회 범위`에서 Cluster와 Namespace를 지정하면 해당 범위 안에서 목록·이름 검색·상태 필터를 함께 적용합니다.
 
 ```text
 조회 범위 열기 → Cluster 목록 지연 조회
@@ -21,7 +21,7 @@ Namespace 선택 → Pod 목록 범위 적용
 - 없는 범위는 404, 서로 모순된 조건은 400입니다. 커서도 범위에 연결하므로 범위가 달라지면 재사용할 수 없습니다.
 - 이는 탐색 필터이며 사용자 권한·멀티 테넌시를 제공하는 기능은 아닙니다.
 
-예: `GET /api/resources?type=POD&clusterId=2&namespaceId=101&limit=100`. 기본 seed에서는 Cluster 2의 Namespace 101 아래 Pod 50개를 조회합니다. 이름·상태 조건을 추가하면 이 50개 안에서만 검색합니다.
+예: `GET /api/resources?type=POD&clusterId=2&namespaceId=101&limit=100`. 현재 기본 seed에서는 Cluster 2의 Namespace 101 아래 Pod 100개를 조회합니다. 이름·상태 조건을 추가하면 이 100개 안에서만 검색합니다.
 
 ## 2. 상태·속성 변경 이력
 
@@ -35,6 +35,8 @@ Mock 배치 → 변경 대상 행 잠금 → 변경 전 상태·속성 확보
 ```
 
 이력에는 유형·리소스 ID·시각·이전/다음 상태·이전/다음 속성·발생원 `MOCK_SIMULATOR`를 저장합니다. Node CPU·메모리나 Pod 재시작 횟수 변화도 확인합니다. 리소스 상태가 같더라도 속성 변화가 있으면 기록합니다. 읽기 API는 `GET /api/resources/{type}/{id}/events?limit=20&beforeId=...`이며 최대 100개, ID 내림차순입니다.
+
+읽기 경로는 `ResourceHistoryController → ResourceHistoryService → ResourceService.detail(존재·Cluster 접근 확인) → ResourceHistoryRepository.list`입니다. Service가 입력 검증과 `limit+1` 조회·페이지/커서 조립을 맡고, HTTP 입력 바인딩은 Controller에 남깁니다. 이력 행 자체에는 Cluster 권한 정보가 없으므로 접근 확인 이전에 이력을 읽지 않습니다. 기존 `detail`/Repository의 읽기 전용 트랜잭션 경계를 유지해 페이지 검증은 DB 연결 없이 처리합니다. 연결 풀이 고갈되어도 잘못된 페이지는 400, 유효한 조회는 기존 안전한 503이며 연결 반환 후 다시 조회할 수 있습니다.
 
 ### 보관 정책
 
@@ -59,7 +61,7 @@ Spring Boot HTTP / JPA 조회 / Mock 배치 / JVM / HikariCP
 
 | 표시 | 의미 |
 |---|---|
-| 수집 대상 상태 | Prometheus의 `up`, API 서비스 수집 가능 여부 |
+| 수집 대상 상태 | `up=1`은 수집 성공, `up=0`은 수집 실패. 누락/비유한 값은 표본 없음, 예상 밖의 유한 값은 확인 불가 |
 | 최근 5분 요청 수 | 리소스 API Counter의 `increase`, 추정 증가량 |
 | API P95 | 리소스 HTTP 처리 시간 Histogram의 최근 5분 근사 95백분위 |
 | DB 조회 P95 | 목록·검색 JPA Repository 호출 구간 Timer의 최근 5분 근사 95백분위 |
@@ -70,6 +72,10 @@ Spring Boot HTTP / JPA 조회 / Mock 배치 / JVM / HikariCP
 | 최근 5분 Mock 실패 | 실패 배치 Counter 증가량 |
 | Mock 배치 P95 | 트랜잭션 처리를 포함한 배치 Timer의 95백분위 |
 
+수집 성공은 관리 endpoint의 지표 응답을 읽었다는 뜻이며 모든 API·DB 기능의 정상을 보장하지 않습니다. 카드 표현만 바꾸고 API의 숫자형 `up` 계약은 유지합니다. Prometheus가 리소스 테이블을 직접 조회하는 구조가 아니라 HTTP 계측·JVM 런타임·HikariCP 상태를 Actuator에서 읽습니다. heap과 활성 연결은 Mock 값이 아닙니다. 별도 PostgreSQL exporter는 구성하지 않았습니다.
+
+P95는 느린 요청이나 예외를 제거한 평균이 아닙니다. 정의한 구간의 약 95%가 그 이하라는 분포 지표이며 현재 API 조회식은 성공 상태만 골라내지 않습니다. 나머지 5%의 지연과 오류도 별도로 확인해야 합니다. heap은 GC 후 추세·최대치·부하와 함께 판단하고 활성 연결은 현재 빌려준 풀 연결 수로 읽습니다. 상세 예시와 모드/기술 선택 근거는 [질문별 학습 문서](STUDY_QUESTIONS.md)에 정리합니다.
+
 API·DB P95 차트는 최근 30분을 표시합니다. DB Timer는 JPA 조회 구성·SQL 왕복·DTO 조립을 포함한 Repository 호출 구간이며 순수 DB 내부 실행 시간은 아닙니다. 전체 유형 검색은 최대 4개의 SQL을 합친 구간으로 기록합니다. 범위 유효성 검증과 모든 상세 SQL은 포함하지 않으며 HTTP Timer와 구간이 다릅니다. P95는 Histogram 버킷으로 계산한 근삿값이고 브라우저 렌더링 시간이나 과제의 500ms 목표와 같지 않습니다. `increase`는 수집 간격을 외삽하므로 정수 Counter도 소수로 나올 수 있습니다.
 
 표본 부족·NaN은 값 없음, Prometheus 장애는 연결 오류로 표시합니다. 임의의 DB 값이나 가짜 0으로 대체하지 않습니다. 실제 요청 표본이 있지만 5xx 시계열만 없을 때는 오류 0을 표시합니다. 화면을 닫거나 숨기면 폴링을 중지하고 실패 시 백오프합니다. 운영 화면에서는 리소스 목록의 정기 폴링을 중지합니다.
@@ -77,13 +83,16 @@ API·DB P95 차트는 최근 30분을 표시합니다. DB Timer는 JPA 조회 �
 ### 안전 경계와 자원 제한
 
 - 브라우저는 `/api/operations/metrics`만 요청합니다. PromQL·대상 URL을 전달할 수 없습니다. 서버에 정의한 10개 지표와 두 시계열만 조회합니다.
+- `PrometheusOperations`는 고정 허용 목록으로 instant/range PromQL을 클래스 초기화 때 한 번 조립·URL 인코딩합니다. 매번 조회 시각만 계산하며 최신 응답을 캐싱하지 않습니다. 정상 조회당 기존처럼 instant 1회·range 1회, 합계 2회 요청하고 값·시계열 변환을 별도 메서드로 처리합니다. 조회식·표시 지표·시간 범위는 변경하지 않습니다.
 - Prometheus 대상은 설정된 루프백 또는 Compose 내부 `prometheus`만 허용하며 리다이렉트를 따르지 않습니다. 응답별 본문 1MiB, 본문 수신까지 3초, 범위 시계열 지표별 최대 31점을 제한합니다.
 - 리소스 이름·ID·검색어를 지표 label에 넣지 않아 시계열 수 증가를 막습니다.
 - Actuator는 API와 별도 관리 포트 8086입니다. 호스트에서는 루프백, 전체 Compose에서는 내부망만 사용하고 NGINX는 `/actuator`를 공개하지 않습니다.
 - Prometheus 기본 보관은 **7일 또는 256MB 제한**입니다. 볼륨이 있으므로 컨테이너 재시작 후 유지되지만 보관 기한·용량 제한이나 볼륨 삭제 시 사라집니다.
 - 기본 과제 모드의 화면/API에는 사용자 인증이 없습니다. 별도 `compose.auth.yaml`은 [Keycloak/Cluster 권한](AUTHENTICATION.md)을 적용합니다. 루프백 바인딩은 인터넷 공개 인증을 대체하지 않으며 인증 모드도 공개 운영용 TLS·접근 제어 검토가 필요합니다.
 
-## 4. 두 실행 모드
+## 4. 실행 모드
+
+제출 시연의 단일 시작 명령·정지·계정 확인과 개발 환경 준비는 [실행 가이드](RUNNING.md)에 정리합니다. 아래 모드를 동시에 실행할 필요는 없습니다.
 
 | 모드 | UI | API | 관리 포트 | Prometheus | DB |
 |---|---|---|---|---|---|
@@ -91,7 +100,7 @@ API·DB P95 차트는 최근 30분을 표시합니다. DB Timer는 JPA 조회 �
 | 전체 Compose | 5175 | 8082 | 8086 내부 전용 | 9092 | 별도 볼륨·내부 전용 |
 | 격리 CI | 5185 | 8089 | 내부 전용 | 9093 | CI 전용 볼륨 |
 | Jenkins | 8182 | 해당 없음 | 해당 없음 | 해당 없음 | Jenkins 전용 볼륨 |
-| 선택형 인증 | 5176 | 8083 | 8086 내부 전용 | 9095 | 인증 앱·Keycloak 별도 DB/볼륨, Keycloak 8183 |
+| 선택형 인증 | 5176 | 8083 | 8086 내부 전용 | 9095 | PostgreSQL 한 서버·monitoring/identity 별도 DB, Keycloak 8183 |
 
 모든 공개 포트는 `127.0.0.1`에 바인딩합니다. 전체 Compose는 개발 DB를 재사용하지 않습니다. 각각 seed된 Mock 데이터이며, 한쪽 데이터 변경이 다른 모드에 자동 반영되지 않습니다.
 
@@ -102,7 +111,7 @@ docker compose -f compose.runtime.yaml --profile monitoring up -d --build
 docker compose -f compose.runtime.yaml --profile monitoring ps
 ```
 
-DB health → Flyway 백엔드 health → 10만 건 idempotent seed 완료 → NGINX 화면 순서로 기동합니다. JDK+Gradle Wrapper/Node 빌드 단계를 분리하고 백엔드·NGINX는 비 root 사용자로 실행합니다. `monitoring` 프로필을 빼면 Prometheus는 실행하지 않으며 운영 화면은 연결 오류를 표시합니다. runtime 백엔드는 Mock 프로필로 시작합니다. [Gradle 전환](GRADLE_BUILD.md)을 참고합니다.
+DB health → Flyway 백엔드 health → 15만 건 idempotent seed 완료 → NGINX 화면 순서로 기동합니다. JDK+Gradle Wrapper/Node 빌드 단계를 분리하고 백엔드·NGINX는 비 root 사용자로 실행합니다. `monitoring` 프로필을 빼면 Prometheus는 실행하지 않으며 운영 화면은 연결 오류를 표시합니다. runtime 백엔드는 Mock 프로필로 시작합니다. [Gradle 전환](GRADLE_BUILD.md)을 참고합니다. 기존 seed 서비스가 이미 완료된 환경은 backend/DB health 확인 후 `docker compose -f compose.runtime.yaml run --rm --no-deps seed`를 명시적으로 다시 실행합니다. 기존 행은 덮어쓰지 않습니다.
 
 호스트 백엔드는 `bash scripts/run-local-backend.sh`로 기동할 수 있습니다. Gradle bootJar를 `.local/runtime/`의 고유 파일명으로 복사해 실행하므로 CI가 `build`를 다시 빌드해도 실행 중인 JAR가 덮어써지지 않습니다. CI와 병행할 때 `build/libs` JAR를 직접 실행하지 않습니다. 일반 개발에는 `./backend/gradlew -p backend bootRun`도 가능합니다.
 

@@ -11,8 +11,14 @@ export async function initializeAuthentication(config: AuthenticationConfigurati
     throw new Error('인증 서버는 HTTPS 또는 로컬 개발 주소여야 합니다.')
   }
   const client = new Keycloak({ url: config.issuer.split('/realms/')[0], realm: 'infrastructure-monitoring', clientId: config.clientId })
-  const ready = await client.init({ onLoad: 'login-required', pkceMethod: 'S256', checkLoginIframe: false, redirectUri: window.location.origin + '/' })
-  if (!ready) throw new Error('로그인이 필요합니다.')
+  const ready = await client.init({ onLoad: 'check-sso', pkceMethod: 'S256', checkLoginIframe: false,
+    silentCheckSsoRedirectUri: window.location.origin + '/silent-check-sso.html',
+    redirectUri: window.location.origin + '/' })
+  if (!ready) {
+    // No session: use the normal login page, never mount anonymously.
+    await client.login({ redirectUri: window.location.origin + '/' })
+    throw new Error('로그인이 필요합니다.')
+  }
   let refreshing: Promise<boolean> | undefined
   configureSession(async () => {
     refreshing ??= client.updateToken(30).finally(() => { refreshing = undefined })

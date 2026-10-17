@@ -50,7 +50,7 @@ async function createPage() {
         if (!current || current.started === null || current.elapsed !== null || current.ending) return
         const rows = [...document.querySelectorAll('.resource-row')]
         const nodes = [...document.querySelectorAll('.tree-name')]
-        const ready = current.kind === 'initial' ? nodes.some(node => node.textContent === 'cluster-01') && rows.length > 0 && document.querySelector('.cards')?.textContent.includes('100,000')
+        const ready = current.kind === 'initial' ? nodes.some(node => node.textContent === 'cluster-01') && rows.length > 0 && document.querySelector('.cards')?.textContent.includes('150,000')
           : current.kind === 'expand' ? nodes.some(node => node.textContent === current.expected)
           : current.kind === 'collapse' ? !nodes.some(node => node.textContent === current.expected)
           : current.kind === 'search' ? rows.length === 1 && rows[0].querySelector('strong')?.textContent === current.expected && document.querySelector('.list-body')?.getAttribute('aria-busy') === 'false'

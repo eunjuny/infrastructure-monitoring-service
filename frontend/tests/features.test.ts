@@ -35,6 +35,47 @@ it('uses Prometheus data and does not substitute missing values with zero', asyn
   vi.spyOn(api,'operations').mockResolvedValue({available:true,source:'Prometheus',fetchedAt:'2026-10-14T00:00:00Z',values:{up:1,heap:1048576,apiP95:null},series:{},message:''})
   const wrapper=mount(OperationsDashboard); wrappers.push(wrapper); await flushPromises()
   expect(wrapper.text()).toContain('Prometheus'); expect(wrapper.text()).toContain('표본 없음'); expect(wrapper.findAll('.operation-cards > div')).toHaveLength(10)
+  expect(wrapper.findAll('.operation-cards dd')[0]!.text()).toBe('수집 성공')
+  expect(wrapper.findAll('.operation-cards dd')[5]!.text()).toBe('1 MiB')
+})
+it('separates simulator metrics behind a closed disclosure without removing their real values', async () => {
+  vi.spyOn(api, 'operations').mockResolvedValue({ available: true, source: 'Prometheus', fetchedAt: '2026-10-14T00:00:00Z',
+    values: { up: 1, mockChanged: 116, mockFailures: 0, mockP95: .025 }, series: {}, message: '' })
+  const wrapper = mount(OperationsDashboard); wrappers.push(wrapper); await flushPromises()
+  expect(wrapper.find('dl[aria-label="서비스 운영 지표"]').findAll('dd')).toHaveLength(7)
+  const disclosure = wrapper.get('.simulator-metrics')
+  expect((disclosure.element as HTMLDetailsElement).open).toBe(false)
+  expect(disclosure.findAll('dd').map(node => node.text())).toEqual(['116 행', '0 회', '25 ms'])
+  ;(disclosure.element as HTMLDetailsElement).open = true
+  expect((disclosure.element as HTMLDetailsElement).open).toBe(true)
+  expect(wrapper.text()).not.toContain('Mock Node 사용률과 다른 데이터입니다.')
+  expect(wrapper.text()).not.toContain('표본이 없으면 0으로 대체하지 않습니다.')
+})
+it('shows a concise empty chart rather than a fabricated zero axis or missing-value units', async () => {
+  vi.spyOn(api, 'operations').mockResolvedValue({ available: true, source: 'Prometheus', fetchedAt: '2026-10-14T00:00:00Z',
+    values: { apiP95: null }, series: { apiP95: [{ timestamp: 1791936000, value: null }] }, message: '' })
+  const wrapper = mount(OperationsDashboard); wrappers.push(wrapper); await flushPromises()
+  expect(wrapper.find('.operation-charts svg').exists()).toBe(false)
+  expect(wrapper.find('.operation-charts').text()).toContain('최근 30분간 추이 표본 없음')
+  expect(wrapper.findAll('.operation-cards dd')[2]!.text()).toBe('표본 없음')
+  expect(wrapper.find('.operation-charts').text()).not.toContain('0–0.0ms')
+})
+it.each([
+  [0, '수집 실패'],
+  [null, '표본 없음'],
+  [undefined, '표본 없음'],
+  [Number.NaN, '표본 없음'],
+  [Number.POSITIVE_INFINITY, '표본 없음'],
+  [2, '확인 불가'],
+])('renders collection state %s as %s without inventing a successful sample', async (up, label) => {
+  vi.spyOn(api, 'operations').mockResolvedValue({
+    available: true, source: 'Prometheus', fetchedAt: '2026-10-14T00:00:00Z',
+    values: up === undefined ? {} : { up }, series: {}, message: '',
+  })
+  const wrapper = mount(OperationsDashboard)
+  wrappers.push(wrapper)
+  await flushPromises()
+  expect(wrapper.findAll('.operation-cards dd')[0]!.text()).toBe(label)
 })
 it('shows source outages explicitly without presenting previous metrics as current', async () => {
   vi.spyOn(api,'operations').mockResolvedValue({available:false,source:'Prometheus',fetchedAt:'2026-10-14T00:00:00Z',values:{},series:{},message:'Prometheus 연결 실패'})

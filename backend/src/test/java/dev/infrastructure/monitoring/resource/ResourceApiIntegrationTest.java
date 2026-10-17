@@ -47,6 +47,58 @@ class ResourceApiIntegrationTest {
         }
     }
 
+    @Test void historyPagesRemainDescendingAndExposeTheSameContract() throws Exception {
+        jdbc.update("delete from resource_change_event where resource_type='POD' and resource_id=1");
+        for (int index = 0; index < 3; index++) {
+            jdbc.update("insert into resource_change_event(resource_type,resource_id,occurred_at,"
+                    + "previous_status,next_status,source,before_attributes,after_attributes)"
+                    + " values ('POD',1,now(),'NORMAL','WARNING','MOCK_SIMULATOR','{}','{}')");
+        }
+        var first = mapper.readTree(mvc.perform(get("/api/resources/POD/1/events").param("limit", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(2))
+                .andExpect(jsonPath("$.items[0].resourceType").value("POD"))
+                .andExpect(jsonPath("$.items[0].resourceId").value(1))
+                .andExpect(jsonPath("$.items[0].previousStatus").value("NORMAL"))
+                .andExpect(jsonPath("$.items[0].nextStatus").value("WARNING"))
+                .andExpect(jsonPath("$.retentionHours").value(24))
+                .andExpect(jsonPath("$.maximumEvents").value(20000))
+                .andExpect(jsonPath("$.hasMore").value(true))
+                .andReturn().getResponse().getContentAsString());
+        long cursor = first.path("nextBeforeId").asLong();
+        assertTrue(first.path("items").get(0).path("id").asLong() > cursor);
+        assertEquals(cursor, first.path("items").get(1).path("id").asLong());
+
+        var last = mapper.readTree(mvc.perform(get("/api/resources/POD/1/events")
+                        .param("limit", "2").param("beforeId", Long.toString(cursor)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.hasMore").value(false))
+                .andExpect(jsonPath("$.nextBeforeId").isEmpty())
+                .andReturn().getResponse().getContentAsString());
+        assertTrue(last.path("items").get(0).path("id").asLong() < cursor);
+    }
+
+    @Test void historyPreservesEmptyNotFoundAndInvalidRequestResponses() throws Exception {
+        mvc.perform(get("/api/resources/POD/100000/events"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(0))
+                .andExpect(jsonPath("$.hasMore").value(false))
+                .andExpect(jsonPath("$.nextBeforeId").isEmpty());
+        mvc.perform(get("/api/resources/POD/999999/events"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
+        mvc.perform(get("/api/resources/POD/0/events")).andExpect(status().isBadRequest());
+        mvc.perform(get("/api/resources/unknown/1/events")).andExpect(status().isBadRequest());
+        for (String limit : new String[]{"0", "101", "abc"}) {
+            mvc.perform(get("/api/resources/POD/1/events").param("limit", limit))
+                    .andExpect(status().isBadRequest());
+        }
+        mvc.perform(get("/api/resources/POD/1/events").param("beforeId", "0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.field").value("events"));
+    }
+
     @Test void scopesDescendantsByClusterAndNamespace() throws Exception {
         mvc.perform(get("/api/resources").param("type","POD").param("clusterId","2").param("limit","100"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].id").value(5001));
@@ -54,6 +106,31 @@ class ResourceApiIntegrationTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(50)).andExpect(jsonPath("$.items[0].parent.id").value(101));
         mvc.perform(get("/api/resources/search").param("q","worker").param("clusterId","2").param("namespaceId","101").param("status","NORMAL"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].resource.id").value(5001)).andExpect(jsonPath("$.items[0].path[0].id").value(2));
+    }
+
+    @Test void appendedPodsKeepOldParentsAndRemainSearchableAndPageable() throws Exception {
+        var first = mapper.readTree(mvc.perform(get("/api/resources/NAMESPACE/1000/children"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(50))
+                .andExpect(jsonPath("$.items[0].id").value(49951))
+                .andExpect(jsonPath("$.items[49].id").value(50000))
+                .andExpect(jsonPath("$.hasMore").value(true))
+                .andReturn().getResponse().getContentAsString());
+        mvc.perform(get("/api/resources/NAMESPACE/1000/children").param("cursor", first.path("nextCursor").asText()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(50))
+                .andExpect(jsonPath("$.items[0].id").value(149951))
+                .andExpect(jsonPath("$.items[49].id").value(150000))
+                .andExpect(jsonPath("$.hasMore").value(false));
+        mvc.perform(get("/api/resources/search").param("type", "POD").param("q", "api-pod-150000"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].resource.id").value(150000))
+                .andExpect(jsonPath("$.items[0].path[0].id").value(10))
+                .andExpect(jsonPath("$.items[0].path[2].id").value(1000));
+        mvc.perform(get("/api/resources/NAMESPACE/2000/children"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(50))
+                .andExpect(jsonPath("$.hasMore").value(false));
     }
 
     @Test void rejectsConflictingUnknownAndIllegalScope() throws Exception {

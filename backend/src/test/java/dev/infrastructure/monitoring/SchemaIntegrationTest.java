@@ -68,7 +68,7 @@ class SchemaIntegrationTest {
         assertThat(jdbc.queryForObject("""
                 select count(*) from (
                   select namespace_id from infrastructure_pod
-                  group by namespace_id having count(*) <> 50
+                  group by namespace_id having count(*) <> case when namespace_id <= 1000 then 100 else 50 end
                 ) unexpected
                 """, Long.class)).isZero();
         assertThat(jdbc.queryForObject("""
@@ -97,13 +97,44 @@ class SchemaIntegrationTest {
                 .andExpect(jsonPath("$.clusters").value(20))
                 .andExpect(jsonPath("$.nodes").value(200))
                 .andExpect(jsonPath("$.namespaces").value(2000))
-                .andExpect(jsonPath("$.pods").value(100000));
+                .andExpect(jsonPath("$.pods").value(150000));
+
+        // Simulate upgrading an existing 100k installation without rewriting its current state.
+        jdbc.update("delete from infrastructure_pod where id > 100000");
+        jdbc.update("update infrastructure_pod set status='WARNING',restart_count=123 where id=1");
+        var original = jdbc.queryForMap("select namespace_id,name,status,updated_at,restart_count from infrastructure_pod where id=1");
+        seed.execute(dataSource);
+        assertExpectedCounts();
+        assertThat(jdbc.queryForMap("select namespace_id,name,status,updated_at,restart_count from infrastructure_pod where id=1"))
+                .isEqualTo(original);
+        assertThat(jdbc.queryForObject("select count(*) from infrastructure_pod where id <= 100000 and namespace_id <> ((id-1)/50)+1", Long.class))
+                .isZero();
+        assertThat(jdbc.queryForObject("select count(*) from infrastructure_pod where id > 100000 and namespace_id <> ((id-100001)/50)+1", Long.class))
+                .isZero();
+        assertThat(jdbc.queryForObject("select count(*) from (select namespace_id from infrastructure_pod group by namespace_id having count(*) <> case when namespace_id <= 1000 then 100 else 50 end) unexpected", Long.class))
+                .isZero();
+
+        // Reproduce the previous appended fixture layout; only the parent changes on upgrade.
+        jdbc.update("update infrastructure_pod set namespace_id=((id-100001)/25)+1 where id > 100000");
+        jdbc.update("update infrastructure_pod set status='WARNING',restart_count=321 where id=150000");
+        var appendedState = jdbc.queryForMap("select id,name,status,updated_at,restart_count from infrastructure_pod where id=150000");
+        seed.execute(dataSource);
+        assertThat(jdbc.queryForMap("select id,name,status,updated_at,restart_count from infrastructure_pod where id=150000"))
+                .isEqualTo(appendedState);
+        assertThat(jdbc.queryForObject("select namespace_id from infrastructure_pod where id=150000", Long.class)).isEqualTo(1000L);
+        assertThat(jdbc.queryForObject("select count(*) from infrastructure_pod where namespace_id<=1000", Long.class)).isEqualTo(100000L);
+        assertThat(jdbc.queryForObject("select count(*) from infrastructure_pod where namespace_id>1000", Long.class)).isEqualTo(50000L);
+        assertThat(jdbc.queryForMap("select namespace_id,name,status,updated_at,restart_count from infrastructure_pod where id=1"))
+                .isEqualTo(original);
+        seed.execute(dataSource);
+        assertThat(jdbc.queryForMap("select id,name,status,updated_at,restart_count from infrastructure_pod where id=150000"))
+                .isEqualTo(appendedState);
     }
 
     private void assertExpectedCounts() {
         assertThat(jdbc.queryForObject("select count(*) from infrastructure_cluster", Long.class)).isEqualTo(20L);
         assertThat(jdbc.queryForObject("select count(*) from infrastructure_node", Long.class)).isEqualTo(200L);
         assertThat(jdbc.queryForObject("select count(*) from infrastructure_namespace", Long.class)).isEqualTo(2000L);
-        assertThat(jdbc.queryForObject("select count(*) from infrastructure_pod", Long.class)).isEqualTo(100000L);
+        assertThat(jdbc.queryForObject("select count(*) from infrastructure_pod", Long.class)).isEqualTo(150000L);
     }
 }

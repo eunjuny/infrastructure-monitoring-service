@@ -79,9 +79,11 @@ q는 필수이며 공백을 제거한 뒤 1~160자입니다. type 생략 시 4�
 
 상세는 `{ "resource": 목록항목, "attributes": 유형별속성, "path": 경로배열 }`입니다.
 
-- Node attributes: cpuUsage, memoryUsage.
-- Pod attributes: restartCount.
-- Cluster와 Namespace attributes는 현재 빈 객체입니다.
+- Cluster attributes: nodeCount, readyNodeCount, podCount, problemPodCount.
+- Node attributes: cpuUsage, memoryUsage, ready, memoryPressure, diskPressure, cpuCapacityCores, memoryCapacityMiB, conditionReason.
+- Namespace attributes: podCount, errorPodCount, notReadyPodCount.
+- Pod attributes: restartCount, phase, containerCount, readyContainerCount, containerState, failureReason, lastTerminationReason, image, workloadKind, workloadName.
+- diagnosticSource="MOCK"가 포함되며 failureReason/lastTerminationReason은 문제 없을 때 null입니다. 집계는 선택 리소스 전체 범위이고 목록 500개·화면 필터 결과 수가 아닙니다. [정의·시나리오·권한·쿼리 예산](RESOURCE_DIAGNOSTICS.md)을 참고합니다.
 - path는 Cluster부터 자기 자신까지 최대 4개의 `{type, id, name}`입니다.
 - 전용 path API 응답은 `{ "items": 경로배열 }`입니다.
 
@@ -120,3 +122,7 @@ q는 필수이며 공백을 제거한 뒤 1~160자입니다. type 생략 시 4�
 - 인증 커서는 issuer/sub/배정 범위에 연결되며 다른 계정의 원본 커서는 400입니다. 커서 자체가 접근 권한은 아닙니다.
 
 세 계정과 상세 경계는 [인증 설계](AUTHENTICATION.md)를 참고합니다.
+
+## 관리자 경보 메일 설정
+
+인증 모드의 ADMIN만 GET/PUT `/api/operations/alert-email`을 사용할 수 있습니다. PUT JSON은 recipient(주소 하나 또는 빈 문자열)·enabled(boolean)이며 응답은 recipient·enabled·smtpConfigured·available입니다. SMTP 비밀값은 받거나 반환하지 않습니다. 형식 오류/SMTP 미설정 중 활성화는 400, 내부 설정·적용 장애는 503, 익명 401·VIEWER 403입니다. 비인증 모드에는 endpoint가 없습니다. 저장은 배달 성공 확인이 아닙니다. [실행·보안·제약](ALERT_EMAIL.md)을 참고합니다.

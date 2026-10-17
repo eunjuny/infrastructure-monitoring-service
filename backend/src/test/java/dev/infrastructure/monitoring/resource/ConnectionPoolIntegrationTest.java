@@ -61,7 +61,11 @@ class ConnectionPoolIntegrationTest {
             try (var held = pool.getConnection(); var secondHeld = pool.getConnection()) {
                 assertFalse(held.isClosed());
                 assertFalse(secondHeld.isClosed());
-                for (String path : new String[]{"/api/resources/summary", "/api/resources?type=POD"}) {
+                mvc.perform(get("/api/resources/POD/1/events").param("limit", "101"))
+                        .andExpect(status().isBadRequest())
+                        .andExpect(jsonPath("$.field").value("events"));
+                for (String path : new String[]{"/api/resources/summary", "/api/resources?type=POD",
+                        "/api/resources/POD/1/events"}) {
                     long started = System.nanoTime();
                     String body = mvc.perform(get(path)).andExpect(status().isServiceUnavailable())
                             .andExpect(jsonPath("$.code").value("STORAGE_UNAVAILABLE"))
@@ -74,9 +78,11 @@ class ConnectionPoolIntegrationTest {
                 }
             }
             mvc.perform(get("/api/resources/summary")).andExpect(status().isOk())
-                    .andExpect(jsonPath("$.pods").value(100000));
+                    .andExpect(jsonPath("$.pods").value(150000));
             mvc.perform(get("/api/resources?type=POD")).andExpect(status().isOk())
                     .andExpect(jsonPath("$.items.length()").value(50));
+            mvc.perform(get("/api/resources/POD/1/events")).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.maximumEvents").value(20000));
         } finally {
             pool.setConnectionTimeout(timeout);
         }

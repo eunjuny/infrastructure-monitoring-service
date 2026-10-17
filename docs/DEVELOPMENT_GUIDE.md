@@ -149,9 +149,9 @@ CI 실행자는 Jenkins 하나로 유지하며 전체 Git SHA를 별도 공간�
 | JPA DTO/LAZY·OSIV off·읽기 트랜잭션·실제 SQL 테스트 | 유지. 게이트는 설정과 일부 import만, SQL 정확성은 통합 테스트로 확인 |
 | 중앙 HTTP·취소·캐시 상한·동적 청크 | 유지. 위험 패턴은 게이트, 동작은 기존 Vitest/E2E로 확인 |
 | 일부 Java/Vue의 압축 문장·wildcard import | 다음 해당 기능 수정 시 좁은 범위로 풀어 씀. 전체 포맷 재작성은 별도 작업 |
-| ResourceHistoryController의 검증·존재 확인·페이지 조립·Repository 직접 호출 | 유스케이스가 커지면 HistoryService로 분리하는 우선 후보. 현재 자동 검사에서 모든 Service 경유를 강제하지 않음 |
-| PrometheusOperations의 조회·변환·안전 제한 집중 | 현재 제한된 책임 묶음 유지. 지표/채널 확장 시 전송·PromQL·응답 변환 분리 검토 |
+| ResourceHistoryController의 검증·존재 확인·페이지 조립·Repository 직접 호출 | 2026-10-17 ResourceHistoryService로 분리. Controller는 HTTP 바인딩·위임, Service는 페이지 검증·접근 확인·응답 조립. 기존 읽기 트랜잭션 경계 유지 |
+| PrometheusOperations의 조회·변환·안전 제한 집중 | 전송은 기존 PrometheusClient, 유스케이스는 dashboard, 값/시계열 변환은 별도 메서드로 분리. 고정 허용 목록의 PromQL/URL 인코딩은 클래스 초기화 시 한 번 수행. 지표별 새 인터페이스/프레임워크는 추가하지 않음 |
 | 포매터/정식 AST 아키텍처 검사 미도입 | 현재 EditorConfig·소규모 텍스트 게이트부터 시작. 필요와 오탐을 보고 별도 도입 결정 |
 | Jenkins 원격 SCM/webhook·실제 탭 메모리 미확인 | 로컬 fixture 체크아웃 검증과 구분. 실제 실행 후 이력에 추가 |
 
-이번 작업은 서비스 동작을 바꾸지 않는 개발 체계 도입입니다. 이후 실제 코드 정리는 목적과 테스트를 가진 개별 작업으로 진행합니다.
+개발 체계 도입과 이후 코드 정리의 결과는 [작업 이력](WORK_HISTORY.md)에 구분합니다. 코드 정리는 목적과 회귀 테스트를 가진 개별 작업으로 진행하며, 위 두 항목의 후속 정리는 WH-029에 기록합니다.

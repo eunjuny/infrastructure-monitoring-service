@@ -5,13 +5,13 @@ import { fileURLToPath } from 'node:url'
 test.beforeEach(async ({ page, request }) => {
   const response = await request.get('/api/resources/summary')
   expect(response.ok()).toBe(true)
-  expect(await response.json()).toEqual({ clusters: 20, nodes: 200, namespaces: 2000, pods: 100000 })
+  expect(await response.json()).toEqual({ clusters: 20, nodes: 200, namespaces: 2000, pods: 150000 })
   await page.goto('/')
   await expect(page.locator('.resource-row').first()).toBeVisible()
 })
 
 test('real seed counts, lazy hierarchy, parent list and typed details', async ({ page }) => {
-  await expect(page.locator('.cards')).toContainText('100,000')
+  await expect(page.locator('.cards')).toContainText('150,000')
   await expect(page.locator('.tree-panel')).toContainText('cluster-01')
   await expect(page.locator('.tree-panel')).not.toContainText('node-001')
   await page.getByRole('button', { name: 'cluster-01 펼치기', exact: true }).click()
@@ -31,7 +31,7 @@ test('real seed counts, lazy hierarchy, parent list and typed details', async ({
 
 test('optional code is loaded on demand while initial data and timestamps remain complete', async ({ page }) => {
   const scripts = () => page.evaluate(() => performance.getEntriesByType('resource').map(entry => new URL(entry.name).pathname))
-  await expect(page.locator('.cards')).toContainText('100,000')
+  await expect(page.locator('.cards')).toContainText('150,000')
   await expect(page.locator('.tree-name').first()).toContainText('cluster-01')
   expect((await scripts()).some(path => /OperationsDashboard-|ResourceEvents-|ResourceDetail-/.test(path))).toBe(false)
   await expect(page.locator('.scope-options')).toHaveCount(0)
@@ -121,6 +121,7 @@ test('operations screen displays actual Prometheus samples', async ({ page, requ
   await page.getByRole('button', { name: '운영 관측', exact: true }).click()
   await expect(page.locator('.operations-dashboard > .scope-note')).toContainText('Prometheus')
   await expect(page.locator('.operation-cards > div')).toHaveCount(10)
+  await expect(page.locator('.operation-cards > div').filter({ hasText: '수집 대상 상태' }).locator('dd')).toHaveText('수집 성공')
   await expect(page.locator('.alert-rules > li')).toHaveCount(3, { timeout: 30000 })
   const alerts = await (await request.get('/api/operations/alerts')).json()
   expect(alerts.available).toBe(true)

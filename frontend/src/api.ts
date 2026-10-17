@@ -5,7 +5,14 @@ export type ResourceType = typeof types[number]
 export type ResourceStatus = 'NORMAL' | 'WARNING' | 'ERROR'
 export type Reference = { type: ResourceType; id: number; name: string }
 export type Resource = Reference & { status: ResourceStatus; updatedAt: string; parent: Reference | null; hasChildren: boolean }
-export type Detail = { resource: Resource; attributes: Record<string, unknown>; path: Reference[] }
+export type ResourceAttributes = Record<string, unknown> & {
+  diagnosticSource?: string; nodeCount?: number; readyNodeCount?: number; podCount?: number; problemPodCount?: number
+  errorPodCount?: number; notReadyPodCount?: number; ready?: boolean; memoryPressure?: boolean; diskPressure?: boolean
+  cpuCapacityCores?: number; memoryCapacityMiB?: number; conditionReason?: string
+  phase?: string; containerCount?: number; readyContainerCount?: number; containerState?: string
+  failureReason?: string | null; lastTerminationReason?: string | null; image?: string; workloadKind?: string; workloadName?: string
+}
+export type Detail = { resource: Resource; attributes: ResourceAttributes; path: Reference[] }
 export type Page<T> = { items: T[]; nextCursor: string | null; hasMore: boolean }
 export type SearchResult = { resource: Resource; path: Reference[] }
 export type Summary = { clusters: number; nodes: number; namespaces: number; pods: number }
@@ -16,6 +23,7 @@ export type EventPage = { items: ChangeEvent[]; nextBeforeId: number | null; has
 export type Operations = { available: boolean; source: string; fetchedAt: string; values: Record<string, number | null>; series: Record<string, { timestamp: number; value: number | null }[]>; message: string }
 export type AlertRule = { name: string; title: string; severity: 'critical' | 'warning'; state: 'inactive' | 'pending' | 'firing'; activeAt: string | null; value: number | null; condition: string; response: string }
 export type AlertSnapshot = { available: boolean; source: string; fetchedAt: string; rules: AlertRule[]; message: string }
+export type AlertEmail = { available: boolean; recipient: string; enabled: boolean; smtpConfigured: boolean }
 export type Scope = { type: ResourceType | ''; parentId?: number; clusterId?: number; namespaceId?: number; q: string; status: ResourceStatus | '' }
 export const REQUEST_TIMEOUT_MS = 10000
 export const keyOf = (r: Reference) => `${r.type}:${r.id}`
@@ -33,7 +41,7 @@ export class ApiError extends Error {
 export class RequestTimeoutError extends Error {
   constructor() { super('서버 응답이 10초를 넘었습니다. 연결을 확인하고 다시 시도해 주세요.') }
 }
-async function get<T>(path: string, signal?: AbortSignal, base = '/api/resources'): Promise<T> {
+async function get<T>(path: string, signal?: AbortSignal, base = '/api/resources', body?: unknown): Promise<T> {
   const controller = new AbortController()
   let timedOut = false
   const cancel = () => controller.abort(signal?.reason)
@@ -53,7 +61,9 @@ async function get<T>(path: string, signal?: AbortSignal, base = '/api/resources
       headers.Authorization = `Bearer ${token}`
     }
     controller.signal.throwIfAborted()
-    const response = await fetch(`${base}${path}`, { signal: controller.signal, headers })
+    if (body !== undefined) headers['Content-Type'] = 'application/json'
+    const response = await fetch(`${base}${path}`, { signal: controller.signal, headers,
+      ...(body === undefined ? {} : { method: 'PUT', body: JSON.stringify(body) }) })
     if (!response.ok) throw new ApiError(response.status)
     return await response.json() as T
   } catch (cause) {
@@ -69,6 +79,9 @@ export const api = {
   me: () => get<CurrentUser>('/me', undefined, '/api/auth'),
   operations: (signal?: AbortSignal) => get<Operations>('/metrics', signal, '/api/operations'),
   alerts: (signal?: AbortSignal) => get<AlertSnapshot>('/alerts', signal, '/api/operations'),
+  alertEmail: (signal?: AbortSignal) => get<AlertEmail>('/alert-email', signal, '/api/operations'),
+  saveAlertEmail: (recipient: string, enabled: boolean, signal?: AbortSignal) =>
+    get<AlertEmail>('/alert-email', signal, '/api/operations', { recipient, enabled }),
   events: (resource: Reference, beforeId?: number | null, signal?: AbortSignal) => get<EventPage>(`/${resource.type}/${resource.id}/events?limit=20${beforeId ? `&beforeId=${beforeId}` : ''}`, signal),
   summary: (signal?: AbortSignal) => get<Summary>('/summary', signal),
   detail: (r: Reference, signal?: AbortSignal) => get<Detail>(`/${r.type}/${r.id}`, signal),

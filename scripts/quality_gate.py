@@ -19,6 +19,8 @@ GRADLE_ZIP_SHA256 = "bd71102213493060956ec229d946beee57158dbd89d0e62b91bca0fa2c5
 GRADLE_WRAPPER_SHA256 = "7d3a4ac4de1c32b59bc6a4eb8ecb8e612ccd0cf1ae1e99f66902da64df296172"
 REQUIRED = {"AGENTS.md", "README.md", "docs/PROJECT_GUIDE.md", "docs/WORK_HISTORY.md",
             "docs/DEVELOPMENT_GUIDE.md", "docs/QUALITY_GATES.md"}
+DOCUMENT_IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png"}
+MAX_DOCUMENT_IMAGE_BYTES = 5 * 1024 * 1024
 SECRET_PATTERNS = (
     re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
     re.compile(r"\bgh[pousr]_[A-Za-z0-9]{36,}\b"),
@@ -26,7 +28,7 @@ SECRET_PATTERNS = (
 )
 
 
-def check_files(files: dict[str, str]) -> list[str]:
+def check_files(files: dict[str, str], image_paths: frozenset[str] = frozenset()) -> list[str]:
     """Check text snapshots. Diagnostics report rule/path, never matched values."""
     errors = []
 
@@ -64,7 +66,7 @@ def check_files(files: dict[str, str]) -> list[str]:
                     elif part != ".":
                         parts.append(part)
                 resolved = "/".join(parts)
-                if target and resolved not in files:
+                if target and resolved not in files and resolved not in image_paths:
                     reject("local-document-link", path)
                     break
 
@@ -100,6 +102,40 @@ def check_files(files: dict[str, str]) -> list[str]:
     if sorted(versions) != list(range(1, len(versions) + 1)):
         errors.append("migration-sequence: backend/src/main/resources/db/migration")
     return errors
+
+
+def check_document_images(root: Path, paths: list[str]) -> tuple[frozenset[str], list[str]]:
+    """Allow bounded repository document images, not arbitrary binary link targets."""
+    valid = set()
+    errors = []
+    for name in sorted(set(paths)):
+        relative = Path(name)
+        if relative.parts[:2] != ("docs", "images") or relative.suffix.lower() not in DOCUMENT_IMAGE_SUFFIXES:
+            continue
+        path = root / relative
+        # Never follow a tracked link into excluded secrets or outside the checkout.
+        if path.is_symlink() or any((root / parent).is_symlink() for parent in relative.parents):
+            errors.append(f"document-image-format: {name}")
+            continue
+        if not path.is_file():
+            continue
+        size = path.stat().st_size
+        if size < 16 or size > MAX_DOCUMENT_IMAGE_BYTES:
+            errors.append(f"document-image-format: {name}")
+            continue
+        with path.open("rb") as source:
+            header = source.read(8)
+            source.seek(-12, 2)
+            ending = source.read(12)
+        if relative.suffix.lower() == ".png":
+            matches = header == b"\x89PNG\r\n\x1a\n" and ending == b"\x00\x00\x00\x00IEND\xaeB`\x82"
+        else:
+            matches = header.startswith(b"\xff\xd8\xff") and ending.endswith(b"\xff\xd9")
+        if matches:
+            valid.add(name)
+        else:
+            errors.append(f"document-image-format: {name}")
+    return frozenset(valid), errors
 
 
 def check_wrapper(root: Path) -> list[str]:
@@ -142,7 +178,9 @@ def run(root: Path) -> int:
             except UnicodeDecodeError:
                 print(f"utf8-encoding: {name}", file=sys.stderr)
                 return 1
-    errors = check_files(files)
+    images, image_errors = check_document_images(root, paths)
+    errors = check_files(files, images)
+    errors.extend(image_errors)
     errors.extend(check_wrapper(root))
     # Once a migration has entered local history, repair via a new migration.
     changed = subprocess.check_output(

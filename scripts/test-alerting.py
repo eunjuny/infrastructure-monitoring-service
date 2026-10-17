@@ -89,7 +89,7 @@ def main():
         eventually(lambda: received('resolved', since), 90)
         steps['resolvedNotificationSeconds'] = round(time.monotonic() - started, 2)
         with urllib.request.urlopen('http://127.0.0.1:5185/api/resources/summary', timeout=10) as response:
-            assert json.load(response) == {'clusters': 20, 'nodes': 200, 'namespaces': 2000, 'pods': 100000}
+            assert json.load(response) == {'clusters': 20, 'nodes': 200, 'namespaces': 2000, 'pods': 150000}
         steps['dataPreserved'] = True
         success = True
     finally:

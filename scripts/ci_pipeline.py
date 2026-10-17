@@ -197,7 +197,7 @@ def perform_isolated(stage, report, env):
         started = time.time()
         execute(runtime('up', '-d', '--no-build', '--pull', 'never'), env)
         eventually(lambda: get_json('http://127.0.0.1:5185/api/resources/summary') ==
-                   {'clusters': 20, 'nodes': 200, 'namespaces': 2000, 'pods': 100000})
+                   {'clusters': 20, 'nodes': 200, 'namespaces': 2000, 'pods': 150000})
         def initial_batch():
             rows = get_json('http://127.0.0.1:5185/api/resources/NODE/1/events')['items']
             return bool(rows) and datetime.datetime.fromisoformat(rows[0]['occurredAt'].replace('Z', '+00:00')).timestamp() >= started

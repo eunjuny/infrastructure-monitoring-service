@@ -49,7 +49,7 @@ final class PrometheusClient {
         }
     }
 
-    private static final class LimitedBody implements HttpResponse.BodySubscriber<byte[]> {
+    static final class LimitedBody implements HttpResponse.BodySubscriber<byte[]> {
         private final CompletableFuture<byte[]> result = new CompletableFuture<>();
         private final ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         private Flow.Subscription subscription;

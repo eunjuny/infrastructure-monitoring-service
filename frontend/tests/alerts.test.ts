@@ -2,9 +2,10 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import OperationsAlerts from '../src/components/OperationsAlerts.vue'
 import { api, type AlertSnapshot } from '../src/api'
+import { session } from '../src/session'
 
 const wrappers: ReturnType<typeof mount>[] = []
-afterEach(() => { wrappers.splice(0).forEach(wrapper => wrapper.unmount()) })
+afterEach(() => { wrappers.splice(0).forEach(wrapper => wrapper.unmount()); Object.assign(session, { enabled: false, name: '', administrator: false, clusters: [] }) })
 const snapshot = (): AlertSnapshot => ({ available: true, source: 'Prometheus', fetchedAt: '2026-10-15T00:00:00Z', message: '실제 경보',
   rules: ['inactive', 'pending', 'firing'].map((state, index) => ({ name: `rule-${index}`, title: `운영 조건 ${index}`, severity: 'warning',
     state: state as 'inactive' | 'pending' | 'firing', activeAt: index ? '2026-10-15T00:00:00Z' : null, value: index ? 3 : null,
@@ -19,6 +20,9 @@ it('shows actual rule states, start time and response guidance', async () => {
   expect(wrapper.text()).toContain('경보 발생 · 주의')
   expect(wrapper.text()).toContain('조건 시작')
   expect(wrapper.text()).toContain('관리 포트를 확인합니다.')
+  expect(wrapper.text()).not.toContain('실제 경보')
+  expect((wrapper.get('.operations-guidance').element as HTMLDetailsElement).open).toBe(false)
+  expect(wrapper.get('.operations-guidance').text()).toContain('백엔드 중단')
 })
 
 it('does not present unavailable rules as no alerts', async () => {
@@ -45,4 +49,16 @@ it('renders descriptions as text and cancels requests on unmount', async () => {
   const signal = request.mock.calls[0]![0]!
   wrapper.unmount()
   expect(signal.aborted).toBe(true)
+})
+
+it('opens the ADMIN mail settings from beside refresh and closes the dialog', async () => {
+  Object.assign(session, { enabled: true, administrator: true })
+  vi.spyOn(api, 'alerts').mockResolvedValue(snapshot())
+  vi.spyOn(api, 'alertEmail').mockResolvedValue({ available: true, recipient: '', enabled: false, smtpConfigured: true })
+  const wrapper = mount(OperationsAlerts); wrappers.push(wrapper); await flushPromises()
+  expect(wrapper.findAll('.alert-actions button').map(button => button.text())).toEqual(['관리자 메일', '경보 새로고침'])
+  await wrapper.get('button[aria-haspopup="dialog"]').trigger('click'); await flushPromises()
+  expect(wrapper.get('[role="dialog"]').text()).toContain('발생·해소 알림 메일 받기')
+  await wrapper.get('button[aria-label="메일 설정 닫기"]').trigger('click')
+  expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
 })

@@ -118,6 +118,7 @@ class ResourceServiceTest {
 
         @Override public boolean exists(ResourceType type, long id) { existenceType = type; return present; }
         @Override public Optional<Row> find(ResourceType type, long id) { return found; }
+        @Override public Map<String, Object> diagnostics(ResourceResponses.Item item) { return Map.of(); }
         @Override public List<Row> list(ResourceQuery q, ResourceCursorCodec.Position p) {
             listCalls++; query = q; position = p; return rows;
         }

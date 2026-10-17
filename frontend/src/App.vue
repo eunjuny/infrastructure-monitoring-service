@@ -40,7 +40,7 @@ const windowStatuses = computed(() => {
   for (const row of list.rows.value) counts[row.resource.status]++
   return counts
 })
-const currentScopeLabel = computed(() => scopeNamespace.value?.name || scopeCluster.value?.name || (parent.value && !query.value.trim() ? parent.value.name : '모든 부모 리소스'))
+const currentScopeLabel = computed(() => scopeNamespace.value?.name || scopeCluster.value?.name || (parent.value && !query.value.trim() ? parent.value.name : '전체 조회 범위'))
 let timer: ReturnType<typeof setTimeout> | undefined
 let detailController: AbortController | undefined, summaryController: AbortController | undefined
 let detailRevision = 0, appliedScope = ''
@@ -122,7 +122,7 @@ async function refreshCurrent(automatic = false): Promise<boolean> {
   const sameScope = appliedScope === JSON.stringify(scope())
   try {
     await Promise.all([sameScope ? list.refresh() : applyFilters(), automatic ? undefined : loadSummary(), tree.value?.refresh(), refreshDetail()])
-    refreshedAt.value = new Date().toLocaleTimeString('ko-KR')
+    refreshedAt.value = shortTimestamp(new Date().toISOString())
     return !list.error.value && !detailError.value && !tree.value?.hasError() && (automatic || !summaryError.value)
   } finally { refreshing.value = false }
 }
@@ -169,10 +169,9 @@ onBeforeUnmount(() => { polling.dispose(); clearTimeout(timer); list.stop(); det
           </button>
         </nav>
         <ResourceTree ref="tree" :selected="selectedKey" @select="select" @browse="browse" />
-        <p class="explorer-note">계층 항목의 <strong>→</strong> 버튼으로<br />해당 부모의 하위 목록을 확인합니다.</p>
       </aside>
       <div class="content-area">
-        <div class="page-header"><div><p class="eyebrow">RESOURCE EXPLORER</p><h1>인프라 리소스 모니터링</h1><p class="muted">리소스의 상태와 위치를 탐색하고 상세 정보를 확인합니다.</p></div><span class="scope-badge"><UiIcon name="layers" />{{ currentScopeLabel }}</span></div>
+        <div class="page-header"><h1>인프라 리소스 모니터링</h1><span class="scope-badge"><UiIcon name="layers" />{{ currentScopeLabel }}</span></div>
         <p v-if="summaryError" class="error" role="alert">건수 조회: {{ summaryError }} <button @click="loadSummary">다시 조회</button></p>
         <dl class="cards" aria-label="저장된 리소스 수">
           <div v-for="resourceType in types" :key="resourceType" :class="{ active: type === resourceType }"><dt>{{ typeDescriptions[resourceType] }}</dt><dd><button :aria-label="`${typeLabels[resourceType]} 전체 목록 보기`" @click="navigateType(resourceType)"><span>{{ summary ? formatCount(summary[summaryKeys[resourceType]]) : '—' }}</span><small>{{ typeLabels[resourceType] }}</small><UiIcon :name="resourceType" /></button></dd></div>
@@ -187,14 +186,14 @@ onBeforeUnmount(() => { polling.dispose(); clearTimeout(timer); list.stop(); det
               <label>상태<select v-model="status" @change="changeStatus"><option value="">모든 상태</option><option value="NORMAL">정상</option><option value="WARNING">주의</option><option value="ERROR">오류</option></select></label>
               <button class="primary" type="submit">조회</button>
             </form>
-            <div class="scope-row"><p class="scope-note">{{ scopeCluster || scopeNamespace ? '선택한 Cluster·Namespace 범위에서 이름과 상태 조건을 함께 조회합니다.' : query.trim() ? '이름 검색은 선택한 유형 전체에서 수행합니다.' : parent ? '선택한 부모의 직속 하위 항목을 조회합니다.' : '서버에서 ID 순서대로 조회합니다.' }}</p><button v-if="query.trim() || status || parent || scopeCluster || scopeNamespace" class="text-button" @click="clearFilters">조건 초기화</button></div>
-            <div class="window-statuses" aria-label="현재 조회창 상태 집계"><span class="window-caption">현재 조회창</span><span class="status-count normal-text"><i />정상 {{ windowStatuses.NORMAL }}</span><span class="status-count warning-text"><i />주의 {{ windowStatuses.WARNING }}</span><span class="status-count error-text"><i />오류 {{ windowStatuses.ERROR }}</span><small>전체 DB 집계 아님</small></div>
+            <div v-if="query.trim() || status || parent || scopeCluster || scopeNamespace" class="scope-row"><p class="scope-note">{{ currentScopeLabel }}<span v-if="query.trim()"> · 이름: {{ query.trim() }}</span><span v-if="status"> · {{ statusLabel(status) }}</span></p><button class="text-button" @click="clearFilters">조건 초기화</button></div>
+            <div class="window-statuses" aria-label="현재 조회창 상태 집계" title="현재 조회된 항목의 상태 집계입니다. 전체 리소스의 상태 집계가 아닙니다."><span class="window-caption">조회된 {{ list.rows.value.length }}개 기준</span><span class="status-count normal-text"><i />정상 {{ windowStatuses.NORMAL }}</span><span class="status-count warning-text"><i />주의 {{ windowStatuses.WARNING }}</span><span class="status-count error-text"><i />오류 {{ windowStatuses.ERROR }}</span></div>
             <div class="list-heading row-columns"><span>이름 / 경로</span><span>유형</span><span>상태</span><span>부모</span><span class="updated-column">갱신 시각</span><span /></div>
             <div class="list-body" :aria-busy="list.busy.value">
               <VirtualList ref="virtual" :items="list.rows.value" :keys="keys" label="리소스 조회 결과" :row-height="60" @end="nextPage">
                 <template #default="{ item }">
                   <button class="resource-row row-columns" :class="{ selected: selectedKey === keyOf(item.resource) }" :aria-pressed="selectedKey === keyOf(item.resource)" @click="select(item.resource)">
-                    <span class="resource-label"><strong>{{ item.resource.name }}</strong><small :title="item.path.map((reference: Reference) => reference.name).join(' / ')">{{ item.path.length ? item.path.map((reference: Reference) => reference.name).join(' / ') : `ID ${item.resource.id}` }}</small></span>
+                    <span class="resource-label"><strong>{{ item.resource.name }}</strong><small v-if="item.path.length" :title="item.path.map((reference: Reference) => reference.name).join(' / ')">{{ item.path.map((reference: Reference) => reference.name).join(' / ') }}</small></span>
                     <span class="type-cell">{{ typeLabels[item.resource.type] }}</span>
                     <span class="badge" :class="item.resource.status.toLowerCase()">{{ statusLabel(item.resource.status) }}</span>
                     <span class="parent-cell" :title="item.resource.parent?.name">{{ item.resource.parent?.name || '—' }}</span>
@@ -207,11 +206,11 @@ onBeforeUnmount(() => { polling.dispose(); clearTimeout(timer); list.stop(); det
               <div v-if="!list.busy.value && !list.error.value && !list.rows.value.length" class="empty-list"><UiIcon name="search" /><p>조건에 맞는 리소스가 없습니다.</p><small>이름이나 상태 조건을 바꿔 다시 조회해 주세요.</small></div>
             </div>
             <p v-if="list.error.value" role="alert" class="error">{{ list.error.value }} <button @click="list.refresh">다시 조회</button></p>
-            <div class="list-footer"><small>{{ list.offset.value + (list.rows.value.length ? 1 : 0) }}–{{ list.offset.value + list.rows.value.length }}번째 · 보관 {{ list.rows.value.length }}개</small><div><button v-if="list.offset.value" @click="applyFilters">처음부터</button><button v-if="list.hasMore.value" :disabled="list.busy.value || Boolean(list.error.value)" @click="nextPage">다음 100개<UiIcon name="arrow" /></button></div></div>
+            <div class="list-footer"><small>{{ list.offset.value + (list.rows.value.length ? 1 : 0) }}–{{ list.offset.value + list.rows.value.length }}번째 · {{ list.rows.value.length }}개 표시</small><div><button v-if="list.offset.value" @click="applyFilters">처음부터</button><button v-if="list.hasMore.value" :disabled="list.busy.value || Boolean(list.error.value)" @click="nextPage">다음 100개<UiIcon name="arrow" /></button></div></div>
           </section>
           <ResourceDetail v-if="selected" :selected="selected" :detail="detail" :busy="detailBusy" :error="detailError" @select="select" @close="closeDetail" @browse="browse" @reveal="reveal" />
         </div>
-        <footer class="console-footer"><span>Mock 인프라 데이터 · 읽기 전용 탐색</span><span v-if="refreshedAt">마지막 조회 시도 {{ refreshedAt }}</span><span v-else>행을 선택하면 상세 정보를 확인할 수 있습니다.</span></footer>
+        <footer class="console-footer"><span>Mock 데이터 · 읽기 전용</span><span v-if="refreshedAt">마지막 조회 시도 {{ refreshedAt }}</span></footer>
       </div>
     </div>
   </main>

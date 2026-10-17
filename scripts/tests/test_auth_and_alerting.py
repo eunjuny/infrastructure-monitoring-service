@@ -22,6 +22,21 @@ RECEIVER = load('alert_receiver', 'infra/alertmanager/receiver.py')
 
 
 class AuthenticationAndAlertsTest(unittest.TestCase):
+    def test_smtp_file_revision_recreates_readers_without_exposing_secret_values(self):
+        with TemporaryDirectory(prefix='monitoring-mail-revision-') as directory:
+            local = Path(directory)
+            smtp = local / 'smtp.json'
+            smtp.write_text('fixture-private-smtp-content')
+            credentials = {'bootstrap': 'fixture', 'appDatabase': 'fixture', 'identityDatabase': 'fixture'}
+            AUTH.write_environment(local, credentials)
+            before = (local / 'compose.env').read_text()
+            os.utime(smtp, ns=(smtp.stat().st_atime_ns, smtp.stat().st_mtime_ns + 1000000))
+            AUTH.write_environment(local, credentials)
+            after = (local / 'compose.env').read_text()
+            self.assertNotEqual(before, after)
+            self.assertNotIn('fixture-private-smtp-content', after)
+            self.assertEqual(2, (ROOT / 'compose.auth.yaml').read_text().count('io.infrastructure.smtp-revision:'))
+
     def cleanup_after_failure(self, stage):
         with TemporaryDirectory(prefix='monitoring-auth-cleanup-') as directory:
             temporary = Path(directory)
@@ -51,6 +66,25 @@ class AuthenticationAndAlertsTest(unittest.TestCase):
         self.assertFalse(client['directAccessGrantsEnabled'])
         self.assertEqual(10, len(realm['users'][1]['groups']))
         self.assertEqual('/cluster-11', realm['users'][2]['groups'][0])
+        self.assertEqual(['admin', 'user1', 'user2'], [user['username'] for user in realm['users']])
+        self.assertEqual('infra-monitor', realm['loginTheme'])
+
+    def test_login_theme_inherits_security_templates_and_is_read_only_mounted(self):
+        theme = ROOT / 'infra/keycloak/themes/infra-monitor/login'
+        self.assertIn('parent=keycloak', (theme / 'theme.properties').read_text())
+        self.assertFalse(list(theme.glob('*.ftl')))
+        self.assertIn('css/infra-monitor.css', (theme / 'theme.properties').read_text())
+        self.assertIn('/opt/keycloak/themes/infra-monitor:ro', (ROOT / 'compose.auth.yaml').read_text())
+
+    def test_existing_legacy_names_fail_before_reprovisioning_without_exposing_credentials(self):
+        credentials = {'users': {key: {'username': username, 'password': 'fixture-private'}
+                                for key, username in [('admin', 'admin'), ('a', 'user1'), ('b', 'user2')]}}
+        AUTH.validate_account_names(credentials)
+        credentials['users']['a']['username'] = 'user-a'
+        with self.assertRaises(ValueError) as captured:
+            AUTH.validate_account_names(credentials)
+        self.assertIn('Legacy local account names', str(captured.exception))
+        self.assertNotIn('fixture-private', str(captured.exception))
 
     def test_junit_drops_sensitive_failure_diagnostics(self):
         report = {'suites': [{'specs': [{'title': 'role isolation', 'tests': [{'results': [{'status': 'failed',

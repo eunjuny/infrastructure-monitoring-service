@@ -3,10 +3,13 @@ import { onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
 import { api, errorMessage, type AlertSnapshot } from '../api'
 import { fullTimestamp } from '../timestamp'
 import { usePolling } from '../usePolling'
+import { session } from '../session'
+import AlertEmailSettings from './AlertEmailSettings.vue'
 
 const data = shallowRef<AlertSnapshot | null>(null)
 const busy = ref(false)
 const error = ref('')
+const emailSettingsOpen = ref(false)
 const states = { inactive: '조건 미충족', pending: '지속 여부 확인 중', firing: '경보 발생' }
 let controller: AbortController | undefined
 
@@ -36,12 +39,12 @@ onBeforeUnmount(() => { controller?.abort(); polling.dispose() })
 </script>
 <template>
   <section class="alert-panel panel" aria-labelledby="operations-alerts-title">
-    <div class="alert-heading"><h2 id="operations-alerts-title">운영 경보</h2><button :disabled="busy" @click="load">경보 새로고침</button></div>
+    <div class="alert-heading"><h2 id="operations-alerts-title">운영 경보</h2><div class="alert-actions"><button v-if="session.enabled && session.administrator" type="button" aria-haspopup="dialog" aria-controls="alert-email-dialog" @click="emailSettingsOpen = true">관리자 메일</button><button :disabled="busy" @click="load">경보 새로고침</button></div></div>
     <p v-if="busy" role="status">경보 상태 조회 중…</p>
     <p v-if="error" role="alert" class="error">{{ error }}</p>
     <p v-if="data && !data.available" role="alert" class="error">{{ data.message }}</p>
     <template v-if="data?.available">
-      <p class="scope-note">{{ data.message }} · 확인 {{ fullTimestamp(data.fetchedAt) }}</p>
+      <p class="scope-note">최근 확인 {{ fullTimestamp(data.fetchedAt) }}</p>
       <ul class="alert-rules">
         <li v-for="rule in data.rules" :key="rule.name" :class="`alert-${rule.state}`">
           <div class="alert-heading"><strong>{{ rule.title }}</strong><span>{{ states[rule.state] }}{{ rule.state === 'firing' ? ` · ${rule.severity === 'critical' ? '심각' : '주의'}` : '' }}</span></div>
@@ -51,6 +54,7 @@ onBeforeUnmount(() => { controller?.abort(); polling.dispose() })
         </li>
       </ul>
     </template>
-    <p class="scope-note">백엔드 중단 시 이 화면도 조회할 수 없습니다. 독립 수신 경로에서 장애·해소 알림을 확인하세요. 조건 미충족은 서비스 전체의 정상 보장이 아닙니다.</p>
+    <details class="operations-guidance"><summary>알림 전달 안내</summary><p class="scope-note">이 화면은 Prometheus의 경보 조건을 표시합니다. 장애·해소 알림은 Alertmanager의 독립 수신 경로로 전달됩니다. 백엔드 중단 시 이 화면은 조회할 수 없으며, 조건 미충족이 서비스 전체의 정상을 보장하지는 않습니다.</p></details>
+    <AlertEmailSettings v-if="emailSettingsOpen && session.enabled && session.administrator" @close="emailSettingsOpen = false" />
   </section>
 </template>

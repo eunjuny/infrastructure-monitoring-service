@@ -21,7 +21,7 @@ Keycloak은 사용자의 로그인과 역할·Cluster 배정을 담당하는 서
 ## 격리 설계
 
 - `scripts/ci-auth.sh`는 별도 Compose 프로젝트 `infrastructure-monitoring-ci-auth`만 생성·정리합니다. `compose.auth.yaml`에 `compose.auth-ci.yaml`을 덧씌웁니다.
-- Compose 2.24.4 이상이 필요합니다. CI 오버레이는 앱/identity PostgreSQL 저장소를 tmpfs로 바꾸어 매 실행의 Flyway·seed·realm import를 확인합니다. 기존 개발/인증 DB를 지우거나 재설정하지 않습니다.
+- Compose 2.24.4 이상이 필요합니다. CI 오버레이는 단일 PostgreSQL 저장소를 tmpfs로 바꾸고 `db-init`이 앱/identity 두 DB와 비관리자 계정을 준비합니다. 매 실행의 Flyway·seed·realm import를 확인하며 기존 개발/인증 DB를 지우거나 재설정하지 않습니다. [공유 서버·권한 분리](SHARED_AUTH_DATABASE.md)를 참고합니다.
 - UI 5186·Keycloak 8193·API 8093·Prometheus 9096·Alertmanager 9196은 루프백이며 사용 중인 인증 UI 5176 등과 다릅니다.
 - CI 전용 계정/DB 비밀번호는 매 실행 새로 생성합니다. `.local/auth-ci`는 0700, 비밀 JSON/env/import 파일은 0600·Git/Docker context 제외입니다. 로컬 인증 계정은 재사용하고 바꾸지 않습니다.
 - API 권한은 서버가 검증한 JWT를 기준으로 합니다. 비인증 모드 fallback·password grant·테스트 토큰 주입은 사용하지 않습니다.

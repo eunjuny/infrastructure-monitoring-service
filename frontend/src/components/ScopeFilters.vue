@@ -42,6 +42,5 @@ onBeforeUnmount(() => { controller?.abort(); revision++; clearTimeout(timer) })
     </div>
     <p v-if="busy" role="status">Namespace 조회 중…</p>
     <p v-if="error" role="alert" class="error">{{ error }} <button @click="loadNamespaces()">다시 조회</button></p>
-    <small>Namespace 목록은 최대 100개씩 조회합니다. 범위는 이름 검색과 상태 필터에도 유지됩니다.</small>
   </details>
 </template>

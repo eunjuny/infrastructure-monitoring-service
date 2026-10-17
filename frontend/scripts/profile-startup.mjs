@@ -43,7 +43,7 @@ try {
     }
     new PerformanceObserver(list => data.longTasks.push(...list.getEntries().map(entry => ({ start: entry.startTime, duration: entry.duration })))).observe({ type: 'longtask', buffered: true })
     const observer = new MutationObserver(() => {
-      if (data.ready !== null || !document.querySelector('.tree-name') || !document.querySelector('.resource-row') || !document.querySelector('.cards')?.textContent.includes('100,000')) return
+      if (data.ready !== null || !document.querySelector('.tree-name') || !document.querySelector('.resource-row') || !document.querySelector('.cards')?.textContent.includes('150,000')) return
       data.ready = -1
       requestAnimationFrame(() => requestAnimationFrame(() => { data.ready = performance.now() }))
     })

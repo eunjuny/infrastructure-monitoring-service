@@ -6,8 +6,9 @@ import './style.css'
 async function start() {
   if (import.meta.env.VITE_AUTH_ENABLED === 'true') {
     try {
-      const { initializeAuthentication } = await import('./authentication')
-      await initializeAuthentication(await api.authConfig())
+      // Independent public config I/O can overlap the auth chunk download/parse.
+      const [{ initializeAuthentication }, config] = await Promise.all([import('./authentication'), api.authConfig()])
+      await initializeAuthentication(config)
     } catch {
       // Never mount the resource screen or fall back to local mode on auth failure.
       const root = document.getElementById('app')!

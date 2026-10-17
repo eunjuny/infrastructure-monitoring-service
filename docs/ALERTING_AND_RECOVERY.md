@@ -1,5 +1,7 @@
 # 운영 경보·독립 알림·복구 검증
 
+인증 환경은 [관리자 경보 메일](ALERT_EMAIL.md)을 추가로 지원합니다. SMTP가 설정되고 ADMIN이 활성화한 경우에만 Alertmanager가 이메일을 직접 발송합니다. 초기 격리 검증은 외부 메일을 사용하지 않았고, 이후 로컬 SMTP로 합성 firing/resolved 전달을 확인했습니다. 격리 CI 복구 검증 자체는 계속 SMTP를 사용하지 않습니다.
+
 ## 목적과 구성
 
 지표를 사람이 읽는 화면에서 장애 조건의 판단·알림·복구 확인까지 확장합니다. 트래픽이 많아야만 의미 있는 기능은 아닙니다. 서비스의 수집 경로와 주기적인 Mock 배치가 정상 동작하는지를 확인할 수 있습니다.
@@ -8,10 +10,11 @@
 Actuator/Micrometer → Prometheus 시계열 → 경보 규칙 평가
                                       ├→ /api/operations/alerts → 관리자 경보 화면
                                       └→ Alertmanager → 독립 local inbox
-복구 → Prometheus 조건 해소 → Alertmanager resolved 알림 → 같은 inbox
+                                                          └→ 선택 시 SMTP 이메일
+복구 → Prometheus 조건 해소 → Alertmanager resolved 알림 → inbox/SMTP
 ```
 
-Prometheus는 조건 판단, Alertmanager 0.34.0은 그룹화·알림 반복 간격·해소 알림·종속 경보 억제를 맡습니다. HTTP webhook 수신기는 Python 표준 라이브러리만 사용하고 별도 컨테이너에서 실행합니다. 메일/외부 SaaS/AI API를 사용하지 않아 추가 서비스 과금은 없지만 로컬 CPU·메모리·디스크는 사용합니다.
+Prometheus는 조건 판단, Alertmanager 0.34.0은 그룹화·알림 반복 간격·해소 알림·종속 경보 억제를 맡습니다. HTTP webhook 수신기는 Python 표준 라이브러리만 사용하고 별도 컨테이너에서 실행합니다. SMTP를 활성화하면 메일 공급자 요금·한도가 적용될 수 있으며 로컬 CPU·메모리·디스크도 사용합니다.
 
 초기에는 **관측·알림·수동 복구 검증**까지 제공합니다. 원인 확인 없이 모든 장애를 자동 재시작시키거나 운영 화면에 Docker 제어권을 주지 않습니다. 금융권/공개 운영용 HA 알림 시스템을 완성한 것은 아닙니다.
 
@@ -45,7 +48,7 @@ Alertmanager는 job·alertname 기준으로 묶고 group_wait 5초, group_interv
 
 수신기는 본문 64KiB·최대 20개 alert·소켓 대기 3초, 메모리의 최근 200개 이벤트만 유지합니다. 이름/job/status를 허용 목록으로 검사하고 이벤트에는 이름·firing/resolved·수신 시각만 남깁니다. 원문 labels/annotations/URL/토큰을 저장·출력하지 않습니다. 비루트·읽기 전용 파일시스템·64MiB·capability 제거를 적용합니다. 재시작 시 inbox 기록은 사라지며 영구 장애 이력/감사 DB가 아닙니다.
 
-Alertmanager는 별도 볼륨과 24시간 알림 로그/해소 상태 retention을 사용합니다. 이것도 장애 이력을 장기 보관하는 DB가 아닙니다. 실제 이메일·Slack 등은 수신처/시크릿/발송 승인을 갖춰 별도 연결해야 하며 이번에는 SMTP를 호출하지 않습니다. Mac/Docker/Prometheus/Alertmanager 전체가 함께 중단되는 장애는 단일 호스트 구성으로 외부에서 감지하지 못합니다.
+Alertmanager는 별도 볼륨과 24시간 알림 로그/해소 상태 retention을 사용합니다. 이것도 장애 이력을 장기 보관하는 DB가 아닙니다. 현재 로컬 SMTP를 연결해 합성 firing/resolved 알림이 공급자에 수락되는 것까지 확인했습니다. SMTP 성공은 최종 편지함 도착/읽음 보장을 뜻하지 않습니다. Mac/Docker/Prometheus/Alertmanager 전체가 함께 중단되는 장애는 단일 호스트 구성으로 외부에서 감지하지 못합니다.
 
 ## 실행과 검증
 

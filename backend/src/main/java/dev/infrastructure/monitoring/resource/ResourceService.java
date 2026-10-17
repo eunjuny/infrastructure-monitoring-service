@@ -2,6 +2,7 @@ package dev.infrastructure.monitoring.resource;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Isolation;
 
 import java.util.List;
 import java.util.function.Function;
@@ -57,6 +58,16 @@ public class ResourceService {
         ResourceQuery.requirePositiveId(id);
         var row = repository.find(type, id).orElseThrow(ResourceRequestException::notFound);
         return new Detail(row.resource(), row.attributes(), row.path());
+    }
+
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public Detail detailWithDiagnostics(ResourceType type, long id) {
+        // The access-checked detail and its aggregates must describe the same DB snapshot.
+        var base = detail(type, id);
+        var attributes = new java.util.LinkedHashMap<String, Object>(base.attributes());
+        attributes.putAll(repository.diagnostics(base.resource()));
+        attributes.put("diagnosticSource", "MOCK");
+        return new Detail(base.resource(), java.util.Collections.unmodifiableMap(attributes), base.path());
     }
 
     public Path path(ResourceType type, long id) {

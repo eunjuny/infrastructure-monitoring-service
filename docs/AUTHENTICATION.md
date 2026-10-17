@@ -6,15 +6,17 @@
 
 | 서비스 계정 | 역할 | 조회 범위 | 기본 seed의 Pod 수 |
 |---|---|---|---:|
-| admin | monitoring-api의 ADMIN | 전체 Cluster·리소스·변경 이력·운영 관측 | 100,000 |
-| user-a | monitoring-api의 VIEWER | Cluster 1~10과 그 하위 | 50,000 |
-| user-b | monitoring-api의 VIEWER | Cluster 11~20과 그 하위 | 50,000 |
+| admin | monitoring-api의 ADMIN | 전체 Cluster·리소스·변경 이력·운영 관측 | 150,000 |
+| user1 | monitoring-api의 VIEWER | Cluster 1~10과 그 하위 | 100,000 |
+| user2 | monitoring-api의 VIEWER | Cluster 11~20과 그 하위 | 50,000 |
 
-세 계정은 한 인증 환경의 같은 100,000개 Pod를 공유합니다. 계정별로 100,000개를 복제하지 않습니다. Cluster 20/Node 200/Namespace 2,000/Pod 100,000 규모로 권한 경계를 검증하기에 충분하므로 기본 데이터 수를 늘리지 않았습니다. 나중에 cardinality/동시 부하를 검증할 때 별도 DB에서 30만·100만 규모를 측정할 수 있지만 계정 수 때문에 데이터 수를 늘릴 필요는 없습니다.
+세 계정은 한 인증 환경의 같은 150,000개 Pod를 공유하며 계정별로 복제하지 않습니다. 기존 100,000개 ID/부모는 유지하고 추가 50,000개만 앞쪽 1,000 Namespace에 50개씩 배정하여 Cluster 1~10은 100,000·11~20은 50,000개입니다. 권한은 ID 구간이 아니라 Cluster 관계이며 추가 ID 100001/125001/150000은 모두 user1 범위입니다. 기존 50001은 여전히 user2 범위여서 큰 ID가 무조건 user2라는 규칙이 아닙니다. 이전 user-a/user-b를 user1/user2로 바꾸되 동일 사용자 ID/sub·암호·role/group은 유지합니다. [데이터 이행·이름 변경·로그인 테마](USER_SCOPES_AND_LOGIN_THEME.md)를 참고합니다. 아래 과거 10만/균등 15만 검증과 새 분포를 구분합니다.
 
 인증 환경과 기존 개발/runtime/CI는 서로 다른 DB 볼륨을 사용합니다. 환경마다 같은 규모의 seed가 존재하는 것과 사용자별 데이터 복제는 구분합니다. 기존 개발 데이터·볼륨을 옮기거나 삭제하지 않았습니다. 이 프로젝트의 계층은 과제 모델이며 실제 Kubernetes RBAC 연동이 아닙니다.
 
 ## 구성과 선택 이유
+
+2026-10-18부터 인증 환경의 PostgreSQL 서버는 한 개입니다. `monitoring`·`identity` DB와 각각의 비관리자 계정을 분리하고 상대 DB 접속을 차단합니다. 기존 설치는 백업·내용 비교 후 이행하며 계정·리소스를 초기화하지 않습니다. 상시 컨테이너는 8개에서 7개로 줄어듭니다. [단일 DB 서버 설계·이행·복구·검증](SHARED_AUTH_DATABASE.md)을 참고합니다.
 
 ```text
 브라우저(Vue) → Keycloak 로그인(Authorization Code + PKCE S256)
@@ -53,6 +55,8 @@ Prometheus → 인증 환경의 backend만 수집 → ADMIN 운영 관측
 
 ## 브라우저·토큰·주소 경계
 
+- 기존 SSO 재진입은 공식 silent check-sso와 같은 origin의 정적 callback으로 앱 문서/JS 중복 로딩을 줄입니다. 세션이 없으면 정상 로그인으로 이동하고 쿠키 제한 시 일반 redirect fallback을 유지합니다. callback은 같은 origin의 부모로만 결과를 전달하며 저장소에 토큰을 기록하지 않습니다. 서버 JWT/역할 검증·api.me 확인 후 화면 마운트는 유지합니다. [공식 어댑터](https://www.keycloak.org/securing-apps/javascript-adapter)를 따릅니다.
+- 공개 인증 설정 요청과 인증 모듈 다운로드를 병렬로 시작하며 인증 실패 시 비인증 모드로 대체하지 않습니다.
 - 인증용 빌드만 `VITE_AUTH_ENABLED=true`로 생성합니다. Keycloak JS 코드는 인증 초기화 시 동적 로드합니다. 기본 과제 모드는 로그인/config 요청을 추가하지 않습니다.
 - 인증 초기화·토큰 갱신에 실패하면 인증 화면/오류를 표시하거나 API 오류를 처리합니다. 인증 실패를 이유로 리소스 화면을 비인증으로 마운트하지 않습니다.
 - Access/Refresh Token은 어댑터 메모리에만 보관하고 localStorage/sessionStorage·Git·보고서에 저장하지 않습니다. 계정에 관한 작은 UI 상태와 토큰을 분리합니다.
@@ -64,7 +68,7 @@ Prometheus → 인증 환경의 backend만 수집 → ADMIN 운영 관측
 
 ## 로컬 실행과 계정 확인
 
-필수: Java/Node가 필요한 기존 검사 환경과 Docker Compose. 전체 인증 앱은 컨테이너에서 실행합니다.
+필수: Python 3.9+와 Docker Compose v2. 인증 앱의 Java/Node 빌드는 컨테이너에서 수행하므로 시연 기동에는 호스트 Java/Node가 필요하지 않습니다. 호스트 테스트·Playwright 검증은 별도 개발 도구가 필요합니다. 시작·정지·모드별 준비 조건과 문제 해결은 [실행 가이드](RUNNING.md)를 참고합니다.
 
 ```bash
 python3 scripts/auth-local.py
@@ -78,7 +82,9 @@ python3 scripts/test-auth.py
 | Keycloak | http://127.0.0.1:8183/ |
 | 인증 환경 Prometheus | http://127.0.0.1:9095/ |
 
-스크립트는 `.local/auth/credentials.json`에 admin/user-a/user-b의 서로 다른 랜덤 비밀번호를 생성합니다. 디렉터리는 0700, credentials/realm/compose.env는 0600이며 값은 터미널·채팅에 출력하지 않습니다. 로그인할 때 본인의 로컬 편집기에서 이 파일을 확인합니다. 비밀 파일을 공개 문서로 복사하거나 메일/스크린샷으로 공유하지 않습니다.
+스크립트는 처음 실행할 때 `.local/auth/credentials.json`에 admin/user1/user2의 서로 다른 랜덤 비밀번호를 생성합니다. 이후 기존 파일은 재사용합니다. 옛 이름의 private 설정이면 계정/볼륨을 자동 삭제하거나 암호를 바꾸지 않고 이행 안내로 중단합니다. 디렉터리는 0700, credentials/realm/compose.env는 0600이며 값은 터미널·채팅에 출력하지 않습니다. 로그인할 때 본인의 로컬 편집기에서 이 파일을 확인합니다. 비밀 파일을 공개 문서로 복사하거나 메일/스크린샷으로 공유하지 않습니다.
+
+2026-10-17 사용자 요청으로 현재 로컬 서비스 계정 세 개만 공통 데모 비밀번호로 변경했습니다. 기존 Realm의 정확한 사용자에 Admin API로 적용하고 Git 제외 credentials/realm 파일을 동기화했습니다. 기본 생성/CI의 랜덤 정책·Keycloak bootstrap·DB 비밀번호·역할/그룹은 바꾸지 않았습니다. 기존 세 계정의 로그인 세션은 종료했으며 이미 발급된 Access Token의 즉시 폐기를 보장하는 변경은 아닙니다. 변경 후 실제 Keycloak E2E 5개(관리자 전체/운영 경보, A/B 범위·교차 차단, 커서·로그아웃)를 통과했습니다. 짧은 공통 비밀번호는 로컬 데모 예외이며 외부 공개·운영/실사용 계정에는 사용하지 않습니다. 비밀번호 자체는 문서/커밋에 남기지 않습니다.
 
 기존 비밀 파일이 있으면 값을 재사용합니다. 재실행으로 기존 사용자 비밀번호를 초기화하거나 Realm을 삭제하지 않습니다. 시작 import는 이미 존재하는 Realm을 덮어쓰지 않으므로 이후 권한/계정 변경은 Keycloak 관리 작업으로 수행해야 합니다.
 
@@ -97,6 +103,8 @@ docker compose --env-file .local/auth/compose.env -f compose.auth.yaml stop
 이 설정은 루프백·HTTP·start-dev의 로컬 데모입니다. 인터넷 공개·운영 Keycloak·HA·고정 도메인/TLS 구성은 포함하지 않습니다. 공개 배포에는 비인증 실행 경로를 노출하지 않고 인증 환경만 배포해야 합니다. Keycloak OSS 자체 사용료·외부 AI/SMTP API 호출은 없지만 컨테이너의 CPU/메모리·디스크는 사용합니다.
 
 ## 검증과 제한
+
+현재 계정/분포/로그인 테마 변경 후 실제 Keycloak 8개를 통과했습니다. ADMIN 전체·user1 100,000/user2 50,000·교차 접근 차단·커서·로그아웃에 브랜드/한국어·1440px/320px·키보드·오류 재제출을 포함합니다. 옛 이름을 자동 재생성하지 않는 오프라인 검사도 추가했습니다. [현재 설계/실행 근거](USER_SCOPES_AND_LOGIN_THEME.md), WH-035를 참고하며 아래 초기 96개/5개와 과거 성능은 도입 당시 기록입니다.
 
 후속 작업에서 실제 Keycloak E2E를 전체 CI/Jenkins에 연결했습니다. CI 전용 프로젝트/주소·tmpfs DB·새 임시 계정을 사용하고 사용 중인 로컬 인증 계정은 변경하지 않습니다. `bash scripts/ci-auth.sh`로 인증 단계만 실행합니다. [Keycloak과 인증 CI/배포의 관계·안전한 보고서·정리](AUTHENTICATION_CI.md)를 참고합니다. 새 `/api/operations/alerts`도 ADMIN 경계를 적용합니다. [경보 설계](ALERTING_AND_RECOVERY.md)의 수신기는 신뢰된 내부 네트워크 전용 도구입니다.
 
