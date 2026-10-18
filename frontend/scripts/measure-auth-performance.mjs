@@ -17,7 +17,7 @@ if (!Number.isInteger(repetitions) || repetitions < 3 || repetitions > 50 || !/^
 const account = JSON.parse(await readFile(new URL('../../.local/auth/credentials.json', import.meta.url), 'utf8')).users.admin
 const samples = Object.fromEntries(['loginSubmit', 'ssoNavigation', 'callbackReady', 'expandCold', 'collapse', 'expandWarm', 'search', 'filter', 'refreshReadOnly', ...(full ? ['refreshChanged', 'pollChanged'] : [])].map(key => [key, []]))
 const targets = { ssoNavigation: 500, callbackReady: 500, expandCold: 100, collapse: 100, expandWarm: 100, search: 300, filter: 200, refreshReadOnly: 200, refreshChanged: 200, pollChanged: 200 }
-const errors = [], checks = [], apiTimings = [], details = []
+const errors = [], checks = [], apiTimings = [], apiFailures = [], details = []
 let originalPod, lastWrittenPod, scrollResult, podRestored = null
 let browser
 
@@ -58,16 +58,20 @@ async function extended(page, cdp) {
   const scroll = await page.evaluate(() => new Promise(resolve => {
     performance.mark('acceptance-scroll-start')
     const viewport = document.querySelector('.list-panel .virtual-viewport')
-    const started = performance.now(), gaps = []
+    const started = performance.now(), gaps = [], oneSecondFrames = Array(10).fill(0)
     let last
     const frame = timestamp => {
-      if (last !== undefined) gaps.push(timestamp - last)
+      if (last !== undefined) {
+        gaps.push(timestamp - last)
+        const window = Math.min(9, Math.floor((timestamp - started) / 1000))
+        oneSecondFrames[window]++
+      }
       last = timestamp
       viewport.scrollTop += 65
-      if (timestamp - started < 4000) requestAnimationFrame(frame)
+      if (timestamp - started < 10000) requestAnimationFrame(frame)
       else {
         performance.mark('acceptance-scroll-end')
-        resolve({ duration: timestamp - started, gaps, visibleRows: document.querySelectorAll('.resource-row').length })
+        resolve({ duration: timestamp - started, gaps, oneSecondFrames, visibleRows: document.querySelectorAll('.resource-row').length })
       }
     }
     requestAnimationFrame(frame)
@@ -81,7 +85,9 @@ async function extended(page, cdp) {
   return { ...scroll, traceDrawFrames: draws.length,
     compositorFPS: draws.length > 1 ? (draws.length - 1) * 1e6 / (draws.at(-1).ts - draws[0].ts) : null,
     rafFPS: scroll.gaps.length * 1000 / scroll.gaps.reduce((sum, gap) => sum + gap, 0),
-    note: 'Supplementary CDP frame timing, not a native Chrome FPS-meter or Task Manager memory result' }
+    minOneSecondRafFPS: scroll.oneSecondFrames.length ? Math.min(...scroll.oneSecondFrames) : null,
+    framesOver18ms: scroll.gaps.filter(gap => gap > 18).length,
+    note: 'Supplementary 10-second CDP/RAF frame timing, not a native Chrome FPS-meter or Task Manager memory result' }
 }
 
 function summarize(values, target) {
@@ -101,7 +107,7 @@ async function measure(page, kind, expected, selector, action) {
   return page.evaluate(() => window.__authPerformance.active.elapsed)
 }
 async function reset(page) {
-  await page.getByRole('button', { name: '전체 Pod', exact: true }).click()
+  await page.getByRole('button', { name: 'Pod 전체 목록 보기', exact: true }).click()
   await page.waitForFunction(() => document.querySelector('.list-body')?.getAttribute('aria-busy') === 'false'
     && document.querySelector('.resource-row strong')?.textContent === 'worker-pod-000001')
 }
@@ -115,7 +121,7 @@ try {
     await cdp.send('Network.enable')
     await cdp.send('Network.setCacheDisabled', { cacheDisabled: true })
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 })
-    let stage = 'login', latestSummary, latestUser, invalidApi = 0
+    let stage = 'login', invalidApi = 0
     const started = new WeakMap(), iterationTimings = []
     page.on('request', request => started.set(request, performance.now()))
     page.on('requestfinished', request => {
@@ -125,37 +131,59 @@ try {
       const category = url.pathname.endsWith('/summary') ? 'summary' : url.pathname.endsWith('/search') ? 'search'
         : url.pathname === '/api/auth/me' ? 'identity' : url.pathname === '/api/auth/config' ? 'config'
         : url.pathname.endsWith('/children') ? 'children' : url.pathname === '/api/resources' ? 'list' : 'other'
-      iterationTimings.push({ stage, category, duration: Number((performance.now() - started.get(request)).toFixed(2)) })
+      const timing = request.timing()
+      const duration = performance.now() - started.get(request)
+      const rounded = value => value >= 0 ? Number(value.toFixed(2)) : null
+      iterationTimings.push({ iteration, stage, category, duration: rounded(duration),
+        browserRequestMs: rounded(timing.responseEnd),
+        responseWaitMs: rounded(timing.responseStart - timing.requestStart),
+        responseBodyMs: rounded(timing.responseEnd - timing.responseStart),
+        observerDeliveryMs: timing.responseEnd >= 0 ? rounded(Math.max(0, duration - timing.responseEnd)) : null,
+      })
     })
-    const responseTasks = []
     page.on('response', response => {
       const url = new URL(response.url())
       if (url.origin !== new URL(baseURL).origin || !url.pathname.startsWith('/api/')) return
-      if (response.status() >= 400) invalidApi++
-      if (url.pathname === '/api/resources/summary' || url.pathname === '/api/auth/me') {
-        responseTasks.push(response.json().then(body => {
-          if (url.pathname.endsWith('/summary')) latestSummary = body
-          else latestUser = body
-        }).catch(() => { invalidApi++ }))
+      if (response.status() >= 400) {
+        invalidApi++
+        const category = url.pathname === '/api/auth/config' ? 'auth-config'
+          : url.pathname === '/api/auth/me' ? 'identity'
+            : url.pathname === '/api/resources/summary' ? 'summary'
+              : url.pathname === '/api/resources/search' ? 'search'
+                : url.pathname === '/api/resources' ? 'list'
+                  : url.pathname.startsWith('/api/operations/') ? 'operations' : 'resource'
+        apiFailures.push({ iteration, stage, category, status: response.status() })
       }
     })
     await page.addInitScript(() => {
       if (location.origin !== 'http://127.0.0.1:5176') return
+      performance.mark('acceptance:app-document-start')
       const probe = window.__authPerformance = {
-        readyMs: null, readyEnding: false, active: null, pending: 0, requests: 0, longTasks: [],
+        readyMs: null, readyEnding: false, active: null, pending: 0, requests: 0, longTasks: [], sequence: 0,
+        start(current) {
+          if (current.started !== null) return
+          current.started = performance.now()
+          current.startMark = `acceptance:${current.id}:start`
+          performance.mark(current.startMark)
+        },
         arm(kind, expected, selector) {
-          this.active = { kind, expected, selector, started: null, elapsed: null, ending: false, requests: this.requests, emptyListObserved: false }
+          this.active = { id: `${kind}-${++this.sequence}`, kind, expected, selector, started: null, elapsed: null,
+            ending: false, requests: this.requests, emptyListObserved: false }
         },
         check() {
           const rows = [...document.querySelectorAll('.resource-row')]
           const nodes = [...document.querySelectorAll('.tree-name')]
           const idle = document.querySelector('.list-body')?.getAttribute('aria-busy') === 'false'
           if (this.readyMs === null && !this.readyEnding && idle && rows.length > 0
-            && nodes.some(node => node.textContent === 'cluster-01')
-            && document.querySelector('.cards')?.textContent.includes('150,000')
-            && document.querySelector('.session-info')?.textContent.includes('전체 관리자')) {
+            && rows[0]?.querySelector('strong')?.textContent === 'cluster-01') {
             this.readyEnding = true
-            requestAnimationFrame(() => requestAnimationFrame(() => { this.readyMs = performance.now() }))
+            requestAnimationFrame(() => requestAnimationFrame(() => {
+              this.readyMs = performance.now()
+              performance.mark('acceptance:cluster-list-ready')
+              if (performance.getEntriesByName('acceptance:app-document-start', 'mark').length) {
+                performance.measure('acceptance:app-document-to-cluster-list', 'acceptance:app-document-start', 'acceptance:cluster-list-ready')
+              }
+            }))
           }
           const current = this.active
           if (!current || current.started === null || current.elapsed !== null || current.ending) return
@@ -174,7 +202,13 @@ try {
           if (!done) return
           current.ending = true
           requestAnimationFrame(() => requestAnimationFrame(() => {
-            if (this.active === current) current.elapsed = Number((performance.now() - current.started).toFixed(2))
+            if (this.active === current) {
+              current.elapsed = Number((performance.now() - current.started).toFixed(2))
+              current.endMark = `acceptance:${current.id}:end`
+              current.measureName = `acceptance:${current.id}`
+              performance.mark(current.endMark)
+              performance.measure(current.measureName, current.startMark, current.endMark)
+            }
           }))
         },
       }
@@ -184,15 +218,15 @@ try {
         const url = new URL(typeof args[0] === 'string' ? args[0] : args[0].url, location.href)
         const api = url.origin === location.origin && url.pathname.startsWith('/api/')
         const current = probe.active
-        if (current?.kind === 'search' && current.started === null && url.pathname.endsWith('/search') && url.searchParams.get('q') === current.expected) current.started = performance.now()
-        if (current?.kind === 'poll' && current.started === null && api && url.pathname === '/api/resources') current.started = performance.now()
+        if (current?.kind === 'search' && current.started === null && url.pathname.endsWith('/search') && url.searchParams.get('q') === current.expected) probe.start(current)
+        if (current?.kind === 'poll' && current.started === null && api && url.pathname === '/api/resources') probe.start(current)
         if (api) { probe.pending++; probe.requests++ }
         return original(...args).finally(() => { if (api) probe.pending--; probe.check() })
       }
       for (const type of ['click', 'change']) document.addEventListener(type, event => {
         const current = probe.active
         if (current && current.kind !== 'search' && current.selector && current.started === null
-          && event.target instanceof Element && event.target.closest(current.selector)) current.started = performance.now()
+          && event.target instanceof Element && event.target.closest(current.selector)) probe.start(current)
       }, true)
       new MutationObserver(() => probe.check()).observe(document, { subtree: true, childList: true, attributes: true, characterData: true })
     })
@@ -215,9 +249,12 @@ try {
       samples.ssoNavigation.push(Number((performance.now() - navigation).toFixed(2)))
       samples.callbackReady.push(Number(ssoReady.readyMs.toFixed(2)))
       details.push({ iteration, phase: 'sso-callback', ...ssoReady })
-      await Promise.all(responseTasks)
-      const valid = latestSummary?.clusters === 20 && latestSummary?.nodes === 200 && latestSummary?.namespaces === 2000
-        && latestSummary?.pods === 150000 && latestUser?.administrator === true
+      stage = 'identity-contract'
+      await page.waitForFunction(() => document.querySelector('.session-info')?.textContent.includes('전체 관리자'))
+      await page.waitForFunction(() => document.querySelector('.cards')?.textContent.includes('150,000'))
+      const visibleCounts = (await page.locator('.cards dd span').allTextContents()).map(value => value.trim())
+      const visibleIdentity = await page.locator('.session-info').innerText()
+      const valid = visibleCounts.join('|') === '20|200|2,000|150,000' && visibleIdentity.includes('전체 관리자')
       if (!valid) throw new Error('AdminDatasetContract')
       await page.getByRole('button', { name: '운영 관측', exact: true }).waitFor()
       await page.getByLabel('자동 갱신').uncheck()
@@ -228,6 +265,9 @@ try {
       stage = 'expandWarm'
       samples.expandWarm.push(await measure(page, 'expand', 'node-001', 'button[aria-label="cluster-01 펼치기"]', () => page.getByRole('button', { name: 'cluster-01 펼치기', exact: true }).click()))
       stage = 'search'
+      await page.getByRole('button', { name: 'Pod 전체 목록 보기', exact: true }).click()
+      await page.waitForFunction(() => document.querySelector('.list-body')?.getAttribute('aria-busy') === 'false'
+        && document.querySelector('.resource-row strong')?.textContent === 'worker-pod-000001')
       samples.search.push(await measure(page, 'search', 'worker-pod-000001', '', () => page.locator('.filters input').fill('worker-pod-000001')))
       stage = 'reset'
       await reset(page)
@@ -246,12 +286,17 @@ try {
         if (await page.evaluate(() => window.__authPerformance.active.emptyListObserved)) throw new Error('RefreshFlicker')
         if (iteration === repetitions - 1) scrollResult = await extended(page, cdp)
       }
-      details.push({ iteration, phase: 'interactions', longTasks: await page.evaluate(() => window.__authPerformance.longTasks) })
+      details.push({ iteration, phase: 'interactions', longTasks: await page.evaluate(() => window.__authPerformance.longTasks),
+        userTiming: await page.evaluate(() => performance.getEntriesByType('measure')
+          .filter(entry => entry.name.startsWith('acceptance:'))
+          .map(entry => ({ name: entry.name, start: Number(entry.startTime.toFixed(2)), duration: Number(entry.duration.toFixed(2)) }))) })
       if (invalidApi) throw new Error('ApiFailure')
-      checks.push({ iteration, administrator: true, counts: latestSummary, invalidApi })
+      checks.push({ iteration, administrator: true, counts: visibleCounts, invalidApi })
     } catch (error) {
       // Error messages/call logs can contain credential form values or callback URLs.
-      errors.push({ iteration, stage, category: error.name === 'TimeoutError' ? 'TimeoutError' : 'ValidationOrBrowserError' })
+      const safeChecks = ['AdminDatasetContract', 'ApiFailure', 'ConcurrentFixtureChange', 'RefreshFlicker']
+      errors.push({ iteration, stage, category: error.name === 'TimeoutError' ? 'TimeoutError'
+        : safeChecks.includes(error.message) ? error.message : 'ValidationOrBrowserError' })
     } finally {
       apiTimings.push(...iterationTimings)
       await context.close()
@@ -265,18 +310,18 @@ try {
       node: process.version, browser: browser.version(), cpuThrottle: 4, cacheDisabled: true, networkThrottle: 'none', viewport: { width: 1440, height: 1000 }, repetitions,
       runtime: 'auth-compose-nginx', serverAlreadyRunning: true, account: 'ADMIN', dataset: { clusters: 20, nodes: 200, namespaces: 2000, pods: 150000 } },
     protocol: { loginSubmit: 'automated submit through real PKCE to ready; excludes human typing; includes automation overhead',
-      ssoNavigation: 'navigation through existing SSO session, silent check or supported redirect fallback, code exchange and ready; includes automation overhead',
-      callbackReady: 'final callback document navigation start to root, first Pod page, counts and ADMIN identity plus two animation frames; not complete SSO navigation',
+    ssoNavigation: 'navigation through existing SSO session, silent check or supported redirect fallback, code exchange and first interactive Cluster list row plus two animation frames; includes automation overhead',
+      callbackReady: 'final callback document navigation start to first interactive Cluster list row plus two animation frames; excludes unrelated summary completion and identity label rendering',
       refreshReadOnly: 'real request group and DOM ready; does not mutate DB or prove changed-value propagation',
-      apiSummary: 'browser request-to-finished timings including queue/network/body; not pure SQL or JWT verification time' },
-    summary, measurements: samples, apiSummary, apiTimings, checks, details, errors, scroll: scrollResult,
+      apiSummary: 'request-to-observer timings; browserRequestMs is browser network timing; responseWaitMs includes network, proxy and server; observerDeliveryMs is estimated reporting delay, never pure server or SQL time' },
+    summary, measurements: samples, apiSummary, apiTimings, apiFailures, checks, details, errors, scroll: scrollResult,
   }
   const output = new URL('../.validation/performance/', import.meta.url)
   await mkdir(output, { recursive: true })
   await writeFile(new URL(`${label}.json`, output), JSON.stringify(report, null, 2) + '\n', { mode: 0o600, flag: 'wx' })
   process.stdout.write(JSON.stringify({ summary, apiSummary, verifiedIterations: checks.length, errors }, null, 2) + '\n')
   if (errors.length || checks.length !== repetitions || Object.entries(summary).some(([key, item]) => item.count !== (key === 'pollChanged' ? 3 : repetitions) || item.overTarget > 0)
-      || (full && (scrollResult?.compositorFPS == null || scrollResult.compositorFPS < 55))) process.exitCode = 1
+      || (full && (scrollResult?.compositorFPS == null || scrollResult.compositorFPS < 55 || scrollResult.minOneSecondRafFPS == null))) process.exitCode = 1
 } catch {
   process.stderr.write('Authentication performance setup failed; sensitive diagnostics were not retained.\n')
   process.exitCode = 1

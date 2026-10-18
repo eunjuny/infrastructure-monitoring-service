@@ -1,5 +1,9 @@
 # 품질 게이트와 개발 하네스
 
+## Chrome 원본 증거 경계
+
+CPU4×·캐시 OFF의 실제 Performance 화면과 이벤트 Duration을 목표별로 보관합니다. 통계에서 만든 PNG는 DevTools 원본이 아닙니다. headless 반복 통과와 GUI 단일 기록, 캐시 재펼침과 최초 네트워크 펼침을 구분합니다. FPS 미터 한 장면으로 전 구간 유지 목표를 통과시키지 않습니다. 현재 성공 실행의 통계는 [최종 결과](FINAL_PERFORMANCE_REVIEW.md)와 WH-051을 기준으로 합니다. 과거 실행은 작업 이력·archive로 보존하고 현재 표본과 섞지 않습니다. 첫 화면/계층은 제품 코드의 고정 이름 User Timing을 사용하고 이전 measure를 지워 누적량을 제한합니다. 초기 목록 이후에만 사용자 표시 정보·계층 루트·집계를 조회하는 동작을 단위/실제 인증 화면에서 확인합니다. `devtools-user-timing.mjs`는 제품 번들에 포함하지 않으며 측정 세션 종료 때 정리합니다.
+
 ## 구성과 실행
 
 ```text
@@ -65,7 +69,11 @@ Windows Wrapper는 `.gitattributes`의 해당 경로에만 `-text`와 `cr-at-eol
 
 ## 이번 도입의 검증과 후속 범위
 
+2026-10-18 평가 초기 계정 정책에 오프라인 회귀 2개를 추가해 도구 테스트가 총 73개입니다. 빈 설정 디렉터리에서 공개 평가 계정 생성·재시작 보존과 CI 임시 비밀번호 분리를 검사합니다. 별도 빈 DB 환경의 실제 Keycloak E2E 14개는 fast와 별도로 실행했습니다. 검증 조건과 테스트 데이터 예외는 [인증 설계](AUTHENTICATION.md), WH-046에 기록합니다.
+
 2026-10-18 리소스 진단 추가 후 서버140개·프론트95개·실제 Keycloak E2E14개·타입/빌드를 재검증했습니다. V4/집계/SQL/권한과 1440px/390px 네 유형 상세를 포함하며 [검증 요약](verification/2026-10-18-resource-diagnostics.json)을 참고합니다. 아래 메일 테스트/성능·전체 Jenkins 결과는 각 시점의 별도 기록입니다.
+
+2026-10-18 컨테이너/GPU/현재 Kubernetes Mock 이벤트 확장 후 PostgreSQL/Testcontainers 39개(진단·스키마·인증·Mock 상태 전환·JPA 조회), Gradle 전체 142개, 프론트 98개, 타입 검사, 프로덕션 빌드와 빠른 게이트 73개가 실패·오류·skip 없이 통과했습니다. 실제 Keycloak E2E 14개도 통과했고 인증 Compose에 V5를 적용했습니다. 외부 SMTP 발송, 실제 Kubernetes 연동, Chrome CPU 4× 상세 진단 성능 반복은 이번 검증에 포함되지 않습니다. [통합 기록](WORK_HISTORY.md#wh-047--pod-컨테이너node-gpu현재-kubernetes-mock-이벤트-추가)을 참고합니다.
 
 2026-10-18 관리자 경보 메일은 오프라인 6개와 SMTP 파일 변경 시 재생성 회귀1개를 추가해 전체 71개 도구 회귀를 구성합니다. 서버 125개·화면 89개·실제 Keycloak E2E 12개를 실행했고, 별도 `python3 scripts/test-alert-email.py`에서 실제 Alertmanager의 발생/해소 메일을 내부 SMTP sink로 확인했습니다. 이 SMTP 검증은 `fast`에 포함하지 않으며 실제 계정/외부 메일을 사용하지 않습니다. [메일 검증 경계](ALERT_EMAIL.md)를 참고합니다. 성능 목표 판정은 별도 반복 결과를 사용합니다.
 

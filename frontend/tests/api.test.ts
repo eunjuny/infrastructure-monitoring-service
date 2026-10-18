@@ -32,6 +32,11 @@ describe('API request contract', () => {
     await api.summary(); await api.detail(resource(25))
     expect(fetch.mock.calls.map(call => call[0])).toEqual(['/api/resources/summary', '/api/resources/POD/25'])
   })
+  it('requests the current Kubernetes event snapshot with a bounded limit', async () => {
+    const fetch = mock([])
+    await api.kubernetesEvents(resource(25))
+    expect(fetch.mock.calls[0]![0]).toBe('/api/resources/POD/25/kubernetes-events?limit=20')
+  })
   it.each([400, 401, 403, 404, 503])('maps HTTP %i without leaking response bodies', async status => {
     mock({ detail: 'internal SQL secret' }, status)
     await expect(api.summary()).rejects.toBeInstanceOf(ApiError)

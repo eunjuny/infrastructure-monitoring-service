@@ -13,6 +13,7 @@
 | GET /api/resources/search | 이름 검색, 선택적 유형·상태 조건, 결과 경로 |
 | GET /api/resources/summary | 실제 테이블별 건수 |
 | GET /api/resources/{type}/{id}/events | 최신 변경 이력·이전 이력 커서 |
+| GET /api/resources/{type}/{id}/kubernetes-events?limit=20 | 현재 상태에 연결된 Kubernetes Mock 이벤트, 최대 20건 |
 | GET /api/operations/metrics | 고정 PromQL의 운영 값·시계열 |
 | GET /actuator/health | 별도 관리 포트 8086의 서비스 상태 |
 | GET /actuator/prometheus | 별도 관리 포트의 Micrometer 지표 |
@@ -80,9 +81,9 @@ q는 필수이며 공백을 제거한 뒤 1~160자입니다. type 생략 시 4�
 상세는 `{ "resource": 목록항목, "attributes": 유형별속성, "path": 경로배열 }`입니다.
 
 - Cluster attributes: nodeCount, readyNodeCount, podCount, problemPodCount.
-- Node attributes: cpuUsage, memoryUsage, ready, memoryPressure, diskPressure, cpuCapacityCores, memoryCapacityMiB, conditionReason.
+- Node attributes: cpuUsage, memoryUsage, ready, memoryPressure, diskPressure, cpuCapacityCores, cpuAllocatableCores, cpuRequestedCores, memoryCapacityMiB, memoryAllocatableMiB, memoryRequestedMiB, conditionReason, gpuDevices[]. GPU 장치 목록은 선택 상세에서 최대 8개입니다.
 - Namespace attributes: podCount, errorPodCount, notReadyPodCount.
-- Pod attributes: restartCount, phase, containerCount, readyContainerCount, containerState, failureReason, lastTerminationReason, image, workloadKind, workloadName.
+- Pod attributes: restartCount, phase, containerCount, readyContainerCount, containerState, failureReason, lastTerminationReason, image, workloadKind, workloadName, containers[]. 컨테이너 배열은 선택 상세에서 최대 4개입니다.
 - diagnosticSource="MOCK"가 포함되며 failureReason/lastTerminationReason은 문제 없을 때 null입니다. 집계는 선택 리소스 전체 범위이고 목록 500개·화면 필터 결과 수가 아닙니다. [정의·시나리오·권한·쿼리 예산](RESOURCE_DIAGNOSTICS.md)을 참고합니다.
 - path는 Cluster부터 자기 자신까지 최대 4개의 `{type, id, name}`입니다.
 - 전용 path API 응답은 `{ "items": 경로배열 }`입니다.

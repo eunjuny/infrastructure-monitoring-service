@@ -51,8 +51,51 @@ public class MockStateRepository {
         entityManager.flush();
         int changed = query(statement).unwrap(org.hibernate.query.NativeQuery.class)
                 .setParameterList("ids", ids).setParameter("changedAt", Timestamp.from(changedAt)).executeUpdate();
+        if (type == ResourceType.POD) updateContainerScenarios(ids);
+        updateKubernetesEvents(type, ids, changedAt);
         entityManager.clear();
         return changed;
+    }
+
+    private void updateContainerScenarios(List<Long> ids) {
+        query("update infrastructure_pod_container c set state = case"
+                + " when p.status = 'ERROR' and p.id % 2 = 0 then 'WAITING'"
+                + " when p.status = 'ERROR' and p.id % 2 = 1 then 'TERMINATED'"
+                + " when p.status = 'WARNING' then 'WAITING' else 'RUNNING' end,"
+                + " ready = (p.status = 'NORMAL'), restart_count = greatest(c.restart_count, p.restart_count)"
+                + " from infrastructure_pod p where c.pod_id = p.id and p.id in (:ids)")
+                .unwrap(org.hibernate.query.NativeQuery.class).setParameterList("ids", ids).executeUpdate();
+    }
+
+    private void updateKubernetesEvents(ResourceType type, List<Long> ids, Instant changedAt) {
+        String table = type.table();
+        query("delete from infrastructure_kubernetes_event e where e.resource_type = :type and e.resource_id"
+                + " in (select id from " + table + " where id in (:ids) and status = 'NORMAL')")
+                .setParameter("type", type.name()).unwrap(org.hibernate.query.NativeQuery.class)
+                .setParameterList("ids", ids).executeUpdate();
+
+        String reason = switch (type) {
+            case CLUSTER -> "ClusterDegraded";
+            case NODE -> "NodeNotReady";
+            case NAMESPACE -> "NamespaceDegraded";
+            case POD -> "BackOff";
+        };
+        String message = switch (type) {
+            case CLUSTER -> "One or more cluster health checks are degraded.";
+            case NODE -> "Kubelet or node pressure condition is degraded.";
+            case NAMESPACE -> "One or more namespace workloads are not ready.";
+            case POD -> "Pod scheduling, readiness, or container restart condition is degraded.";
+        };
+        String insert = "insert into infrastructure_kubernetes_event"
+                + "(resource_type,resource_id,event_type,reason,message,first_seen_at,last_seen_at,occurrence_count)"
+                + " select :type,r.id,case when r.status='ERROR' then 'WARNING' else 'NORMAL' end,:reason,:message,"
+                + ":changedAt,:changedAt,1 from " + table + " r where r.id in (:ids) and r.status <> 'NORMAL'"
+                + " on conflict(resource_type,resource_id) do update set event_type=excluded.event_type,"
+                + " reason=excluded.reason,message=excluded.message,last_seen_at=excluded.last_seen_at,"
+                + " occurrence_count=least(infrastructure_kubernetes_event.occurrence_count::bigint+1,2147483647)::integer";
+        query(insert).unwrap(org.hibernate.query.NativeQuery.class).setParameter("type", type.name())
+                .setParameter("reason", reason).setParameter("message", message)
+                .setParameter("changedAt", Timestamp.from(changedAt)).setParameterList("ids", ids).executeUpdate();
     }
 
     private Query query(String sql) {

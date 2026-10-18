@@ -1,142 +1,318 @@
 # Infrastructure Monitoring Service
 
-15만 개의 Mock Pod를 PostgreSQL에 저장하고, 계층 탐색·검색·상태 갱신을 제공하는 인프라 모니터링 서비스입니다. 리소스를 필요한 만큼만 조회·렌더링하며, 사용자별 조회 권한과 서비스 운영 관측을 함께 제공합니다.
+15만 Pod 규모의 인프라 시나리오 데이터를 PostgreSQL에 저장하고, 계층 탐색·검색·상세 확인·상태 변화를 제공하는 모니터링 웹 애플리케이션입니다. Keycloak 사용자 인증과 Prometheus 기반 운영 관측도 포함합니다. 초기 데이터는 제공된 배치로 준비합니다.
 
-> 과제에서 정의한 `Cluster → Node → Namespace → Pod` 드릴다운 모델을 사용합니다. 실제 Kubernetes 클러스터에 연결하지 않으며, 리소스 상태·사용률은 Mock 데이터입니다.
+> 탐색은 과제에서 정한 `Cluster → Node → Namespace → Pod` 모델을 따릅니다. Node 아래 Namespace 단위로 실행 중인 Pod를 좁혀 가는 드릴다운 조회를 제공합니다.
 
-## 빠른 실행
+## 프로젝트 실행 방법
 
-Docker를 실행한 상태에서 **프로젝트 루트**에서 아래 명령을 실행합니다. Python 3.9+와 Docker Compose v2가 필요하며, 호스트에 Java·Node.js를 설치할 필요는 없습니다.
+### 1. 실행 준비
+
+Docker Engine/Desktop와 Docker Compose v2, Python 3.9+를 준비하고 Docker를 실행합니다. 프로젝트 폴더에서 다음 단계를 진행합니다. Java·Node.js와 DB는 컨테이너 안에서 실행되므로 별도로 설치하지 않아도 됩니다.
+
+첫 빌드에는 이미지·의존성 다운로드를 위한 인터넷 연결이 필요합니다. 서비스가 사용하는 로컬 포트 `5176`, `8083`, `8183`, `9095`, `9195`가 비어 있어야 합니다.
+
+### 2. 서비스와 초기 데이터 준비
 
 ```bash
 python3 scripts/auth-local.py
 ```
 
-이미지 빌드, DB 초기화, Flyway, 15만 Pod 적재, 인증·모니터링 서비스 시작까지 처리합니다. 최초 실행은 이미지·의존성 다운로드를 위한 인터넷 연결이 필요합니다. 준비 완료 메시지 후 **[서비스 열기](http://127.0.0.1:5176/)** 에 접속합니다. 같은 명령으로 재실행하면 기존 계정·DB를 재사용합니다.
+명령 하나로 초기 데이터베이스·인증·초기 데이터를 준비하고 웹 서비스를 실행합니다. 이 명령은 브라우저 창을 자동으로 열지는 않습니다. 완료 안내가 나오면 아래 주소를 브라우저에서 열어 주세요. 별도의 프론트엔드 실행 명령은 필요하지 않습니다.
 
-| 서비스 계정 | 조회 범위 | Pod 수 | 운영 관측 |
-|---|---|---:|---|
-| `admin` | 모든 Cluster | 150,000 | 사용 가능 |
-| `user1` | Cluster 1~10 | 100,000 | 접근 불가 |
-| `user2` | Cluster 11~20 | 50,000 | 접근 불가 |
+1. PostgreSQL과 서비스용·인증용 DB를 생성하고 Flyway 마이그레이션을 적용합니다.
+2. Cluster 20개, Node 200개, Namespace 2,000개, **Pod 150,000개**를 적재합니다.
+3. Keycloak에 초기 계정 `admin`, `user1`, `user2`와 역할·Cluster 권한을 등록합니다.
+4. 백엔드·프론트엔드·Prometheus·Alertmanager·내부 알림 수신기를 기동하고 API와 OIDC 준비 상태를 확인합니다.
 
-비밀번호는 최초 실행 시 생성하는 Git 제외 파일 `.local/auth/credentials.json`에서 로컬 편집기로 확인합니다. 기존 설치는 저장된 비밀번호를 사용합니다. **이 파일과 DB 볼륨을 임의로 삭제하지 마세요.** 모든 공개 포트는 `127.0.0.1` 전용이며 외부 공개용 설정이 아닙니다.
+`Authentication environment ready`가 표시되면 [http://127.0.0.1:5176](http://127.0.0.1:5176)에 접속합니다.
 
-상태 확인과 정지(데이터·계정 보존):
+스크립트는 Docker Compose를 사용해 아래 **상시 서비스 7개**를 실행합니다. `db-init`, `auth-import`, `seed`는 초기 준비에만 쓰이는 일회성 작업 컨테이너이며, 완료 코드 0으로 종료되는 것이 정상입니다.
+
+| 상시 서비스 | 역할 |
+|---|---|
+| `frontend` | 빌드된 Vue 화면을 NGINX로 제공하고 `/api` 요청을 백엔드로 전달 |
+| `backend` | Spring Boot API, 인증·권한 검증, PostgreSQL 조회, 상태 갱신 |
+| `db` | PostgreSQL 서버 1개 안에서 학습/모니터링 DB와 Keycloak identity DB 제공 |
+| `keycloak` | OIDC 로그인, 사용자·역할·Cluster 그룹 정보 제공 |
+| `prometheus` | 백엔드 Actuator/Micrometer 지표를 주기적으로 수집하고 보관·경보 평가 |
+| `alertmanager` | Prometheus 경보 그룹화·반복·해소 알림을 내부 수신기와 선택한 SMTP로 전달 |
+| `alert-receiver` | Alertmanager 알림을 앱과 독립적으로 받아 최근 이벤트를 제한 보관하고 메일 설정을 중계 |
+
+### 3. 로그인
+
+초기 로컬 계정의 비밀번호는 모두 **`1234`**입니다.
+
+| 계정 | 비밀번호 | 접근 범위 | Pod 수 | 운영 관측 |
+|---|---|---|---:|---|
+| `admin` | `1234` | 전체 Cluster | 150,000 | 가능 |
+| `user1` | `1234` | Cluster 1~10 | 100,000 | 불가 |
+| `user2` | `1234` | Cluster 11~20 | 50,000 | 불가 |
+
+세 계정은 로컬 테스트용이며 서비스는 로컬 주소에만 노출됩니다. DB·Keycloak 초기화 관리자·내부 제어용 비밀값은 실행 시 별도 생성됩니다.
+
+### 4. 기능 확인
+
+`admin`으로 로그인해 상단 리소스 건수와 Cluster 목록을 확인합니다. 왼쪽 계층에서 Cluster → Node → Namespace → Pod를 펼치고, Pod를 선택해 상세·변경 이력을 확인합니다. 이름 검색과 상태·Cluster·Namespace 범위 필터를 적용한 뒤 검색 결과의 계층 위치로 이동할 수 있습니다.
+
+자동 갱신을 켜면 상태 변화가 화면에 반영됩니다. 선택형 시뮬레이터는 5초마다 Cluster 1개·Node 5개·Namespace 10개·Pod 100개를 차례로 갱신합니다. 15만 Pod 전체를 5초마다 바꾸지 않으며 Pod ID 전체 순환은 약 125분입니다. 화면 폴링은 이와 별도입니다. Node 상세에는 용량·할당 가능량·Pod CPU·메모리 요청량·현재 사용량과 GPU 장치 정보가, Pod 상세에는 컨테이너별 상태·CPU/메모리 요청과 사용량이 표시됩니다. 이벤트 펼침에서 현재 상태 이벤트를 확인할 수 있습니다. `운영 관측`에서는 Prometheus가 수집한 API·DB·JVM 지표, 추이 차트와 경보를 확인합니다. 로그아웃 후 `user1`, `user2`로 로그인하면 각각 10만·5만 Pod의 조회 범위와 관리자 메뉴 접근 제한을 확인할 수 있습니다.
+
+#### 관리자 메일 알림 (선택)
+
+기본 구성에는 SMTP 계정이나 앱 비밀번호가 포함되지 않습니다. 메일 발송을 사용하려면 STARTTLS SMTP 서버의 주소·발신 주소·사용자명·앱 비밀번호를 로컬에 등록합니다. SMTP 설정 없이도 웹 화면, 수집 지표, Prometheus 경보, 내부 알림 수신기는 동작합니다.
+
+1. 먼저 위 명령으로 서비스를 실행합니다.
+2. 프로젝트 루트에서 `python3 scripts/configure-alert-email.py`를 실행하고, 프롬프트에 SMTP 정보 네 가지를 입력합니다. 비밀번호 입력은 화면에 표시되지 않습니다.
+3. `python3 scripts/auth-local.py`로 구성을 반영해 재기동합니다.
+4. `admin`으로 운영 관측을 열고 **관리자 메일** 팝업에서 수신 주소와 메일 받기를 저장합니다.
+
+SMTP 구성은 프로젝트 루트의 Git 제외 `.local/auth/smtp.json`에 권한 0600으로 저장됩니다. 비밀정보를 Git에 추가하거나 다른 사람과 공유하지 마세요. 앱은 단일 관리자 수신 주소와 발송 활성 여부만 저장합니다. Alertmanager가 SMTP로 메일을 보내며, 화면의 경보 발생은 메일함 배달을 보장하지 않습니다.
+
+### 5. 실행 상태 확인과 종료
 
 ```bash
-docker compose --env-file .local/auth/compose.env -f compose.auth.yaml ps
+docker compose --env-file .local/auth/compose.env -f compose.auth.yaml ps --all
 docker compose --env-file .local/auth/compose.env -f compose.auth.yaml stop
 ```
 
-다른 실행 모드, 포트, 문제 해결은 [실행 가이드](docs/RUNNING.md)를 참고합니다. 이전 두 PostgreSQL 서버를 사용하는 설치만 [DB 이행 절차](docs/SHARED_AUTH_DATABASE.md)가 필요합니다.
+7개 상시 서비스가 실행되고, 초기 설정·데이터 적재를 담당하는 `db-init`, `auth-import`, `seed`가 종료 코드 0이면 정상입니다. `stop`은 데이터를 보존합니다. 다시 실행할 때는 2단계 명령을 사용하면 됩니다. 재시작 시 기존 데이터와 계정 설정을 재사용합니다.
 
-## 주요 기능
+데이터를 보존하며 멈출 때는 `docker compose --env-file .local/auth/compose.env -f compose.auth.yaml stop`을 사용합니다. `down -v`는 DB 볼륨의 데이터를 삭제하므로 데이터가 필요하면 사용하지 마세요.
+
+## 사용한 기술 및 선택 이유
+
+| 기술 | 적용 이유 |
+|---|---|
+| Java 21 · Spring Boot 3.5 · Gradle | REST API와 서버 정책을 타입이 명확한 단일 백엔드로 구현하고, Gradle Wrapper로 빌드 환경을 고정합니다. |
+| PostgreSQL 17 · JPA/Hibernate · Flyway | 대량 계층·상태·변경 이력을 영속화하고, 관계 조회·인덱스·스키마 이행을 실제 DB에서 검증합니다. |
+| Vue 3 · TypeScript · Vite | 계층 탐색과 상세·필터 화면을 상태가 분리된 UI로 구성하고, 응답 타입을 정적으로 확인합니다. |
+| NGINX | 빌드된 프론트엔드 정적 자산을 제공하고 브라우저의 `/api` 요청을 백엔드로 전달합니다. |
+| Keycloak · OAuth2/OIDC | 애플리케이션과 인증 서버를 분리하고, 로그인 토큰의 사용자·역할·Cluster 접근 범위를 검증합니다. |
+| Micrometer · Actuator · Prometheus · Alertmanager | 애플리케이션 지표 수집, 시계열 조회, 경보 평가와 알림 전달을 각각 분리합니다. |
+| Docker Compose | 웹·API·DB·인증·관측 서비스를 의존 순서에 맞춰 함께 실행합니다. |
+| Jenkins | 특정 Git 커밋을 별도 작업 폴더에 받아 서버·화면·실제 DB·로그인 테스트와 이미지 빌드를 실행하고 결과를 수집합니다. |
+| JUnit 5 · Mockito · Testcontainers · Vitest · Playwright | 서버 단위/실제 PostgreSQL 통합, 프론트 상태/브라우저 동작을 각 경계에서 검사합니다. |
+
+## 프로젝트 구조
+
+```text
+backend/       Spring Boot API, JPA 도메인, 인증, 계측
+frontend/      Vue 화면, API 클라이언트, 가상 리스트
+scripts/       초기 데이터 적재, 로컬 실행, 검증 도구
+infra/         Prometheus·Alertmanager 설정
+compose.auth.yaml  인증 포함 통합 실행 구성과 기동 순서
+Jenkinsfile    Jenkins 검증 파이프라인
+docs/          API·설계·운영·성능 검증 문서
+```
+
+```mermaid
+flowchart LR
+  UI[Vue 3] --> Proxy[Nginx]
+  Proxy --> API[Spring Boot REST API]
+  API --> DB
+  UI -. OIDC 로그인 .-> KC[Keycloak]
+  KC --> Identity
+  subgraph PG["PostgreSQL 17 · 서버 1개"]
+    DB[(monitoring DB)]
+    Identity[(identity DB)]
+  end
+  API -. JWT 서명 검증용 공개키 .-> KC
+  API --> M[Micrometer·Actuator]
+  Prom[Prometheus] -->|scrape| M
+  API -->|고정 PromQL 조회| Prom
+  Prom -->|경보 규칙| AM[Alertmanager]
+  AM --> Receiver[내부 수신기]
+  AM -. SMTP 설정 시 .-> Email[관리자 메일]
+```
+
+## 구현한 기능
 
 | 기능 | 동작 |
 |---|---|
-| 계층 탐색 | 노드를 펼칠 때 하위 리소스를 조회하고, 선택 시 상세 속성과 상위 경로를 표시합니다. |
-| 리소스 진단 | Cluster/Namespace 하위 집계, Node 준비/압박 조건·용량, Pod 실행/준비 상태·사유·대표 이미지·워크로드를 표시합니다. |
-| 검색·필터 | 이름·유형·상태·Cluster·Namespace 조건을 조합하고, 검색 결과의 계층 위치로 이동합니다. |
-| 대용량 목록 | 서버 커서 페이지와 가상 리스트로 전체 데이터를 한 번에 내려받거나 DOM에 그리지 않습니다. |
-| 상태 갱신·이력 | 수동 새로고침과 자동 폴링을 지원하며 상태·속성 변경 전후를 상세 패널에서 확인합니다. |
-| 로그인·접근 제어 | Keycloak 로그인 후 서버가 JWT와 Cluster 권한을 검증해 목록·집계·상세·이력을 제한합니다. |
-| 운영 관측 | 관리자가 요청 수·오류·API/DB P95·JVM Heap·DB 연결과 추이 차트·경보를 확인합니다. |
-| 경보 메일 | ADMIN은 경보 카드의 `관리자 메일` 팝업에서 수신 주소·발송 여부를 관리하고, Alertmanager가 발생·해소 메일을 직접 보냅니다. |
+| 계층 탐색 | Cluster → Node → Namespace → Pod를 펼쳐 하위 리소스를 지연 조회합니다. |
+| 리소스 상세 | 이름·상태·갱신 시각과 경로, 유형별 진단 정보를 표시합니다. Node는 용량·할당·사용량과 GPU, Pod는 컨테이너별 상태·요청/사용량·재시작 정보를 제공합니다. |
+| 리소스 이벤트 | 현재 리소스 상태에 연결된 reason·message·최초/최근 발생 시각·반복 횟수를 표시합니다. 정상 상태로 돌아오면 현재 이벤트가 제거됩니다.  |
+| 검색·필터 | 이름·유형·상태·Cluster·Namespace로 좁히고 검색 결과에서 계층 위치로 이동합니다. |
+| 상태 갱신·이력 | 수동 새로고침과 5초 주기 폴링으로 상태를 갱신하고, 변경 이력에서 이전·이후 값을 확인합니다. |
+| 사용자별 접근 | Keycloak 로그인과 서버 권한 검증으로 user1/user2의 Cluster 조회 범위를 제한합니다. ADMIN은 전체 리소스와 운영 관측에 접근합니다. |
+| 운영 관측·알림 | 관리자 화면에서 Prometheus가 수집한 API/DB/JVM 지표와 경보를 확인합니다. Alertmanager는 내부 수신 경로에 전달하고 SMTP 설정 시 관리자 메일도 보냅니다. |
 
-화면 왼쪽에서 계층을 펼치고, 가운데 목록에서 검색·필터·선택을 수행합니다. 오른쪽 상세 패널에는 속성·경로·변경 이력이 표시됩니다. 운영 관측은 관리자 메뉴에서 접근합니다.
+### 추가 구현 항목
 
-상세 `리소스 진단`은 Mock 메타데이터·상태 시나리오와 실제 DB 범위 집계입니다. 기존 설치는 백엔드/프론트 재빌드 후 Flyway V4가 적용되며 계정·15만 리소스의 기존 상태/관계를 초기화하지 않습니다. [필드·범위·이행·검증](docs/RESOURCE_DIAGNOSTICS.md)을 참고합니다.
+기본 계층 탐색·검색·상태 필터·갱신에 더해, 여러 Cluster를 운영하면서 대상과 장애 원인을 찾고 서비스 자체의 상태까지 확인할 수 있도록 다음 기능을 추가했습니다.
 
-## 구조와 기술
-
-인증 환경은 **PostgreSQL 서버 하나**에 서비스용 `monitoring`과 Keycloak용 `identity` DB를 둡니다. 각 전용 계정의 접속 권한을 분리하며 개발 모드·비인증 Compose의 DB와는 공유하지 않습니다.
-
-| 영역 | 기술 | 적용 |
+| 추가 항목 | 구현 내용 | 추가한 이유 |
 |---|---|---|
-| Backend | Java 21, Spring Boot 3.5, JPA/Hibernate | REST API, DTO projection, 트랜잭션, JWT 검증 |
-| Database | PostgreSQL 17, Flyway | 계층 데이터·이력, 스키마 이행, 검색·커서 인덱스 |
-| Frontend | Vue 3, TypeScript, Vite | 지연 로딩 트리, 가상 리스트, 제한 캐시, 폴링 |
-| Authentication | Keycloak, OAuth2/OIDC | Authorization Code + PKCE 로그인, 역할·Cluster 권한 |
-| Observability | Actuator, Micrometer, Prometheus, Alertmanager | 계측·시계열 조회·경보 평가·독립 내부 수신 |
-| Build / CI | Gradle Wrapper, Docker Compose, Jenkins | 버전 고정 빌드, 컨테이너 실행, 격리 검증 |
-| Test | JUnit 5, Mockito, Testcontainers, Vitest, Playwright | 단위·실제 PostgreSQL·컴포넌트·브라우저 검증 |
+| Cluster·Namespace 범위 선택 | 선택 범위를 목록·이름 검색·상태 필터에 함께 적용합니다. | 이름이 비슷한 리소스가 많은 환경에서 필요한 운영 범위로 조회 대상을 좁히기 위해서입니다. |
+| 리소스별 진단 정보 | Node의 CPU·메모리 용량/할당/사용량과 GPU 장치, Pod의 컨테이너별 준비 상태·재시작·요청/사용량, 현재 이벤트를 제공합니다. | 정상/경고/오류 표시만으로 부족한 원인 확인에 필요한 정보를 상세 화면에 모으기 위해서입니다. |
+| 상태 변경 이력 | 변경 시각과 이전·이후 상태/속성을 저장하고 상세 화면에서 조회합니다. | 현재 상태만으로는 확인하기 어려운 반복적인 상태 전환과 사용량 변화를 확인하기 위해서입니다. |
+| 로그인·사용자별 조회 권한 | Keycloak OIDC 로그인과 서버 JWT 검증을 적용하고, 사용자별 Cluster 범위 및 관리자 전용 API·메뉴를 구분합니다. | 같은 서비스를 사용하더라도 담당 Cluster와 운영 정보의 접근 범위를 분리하기 위해서입니다. |
+| 관리자 운영 관측 | Prometheus에서 API 오류·응답 지연·DB 조회·JVM 메모리·연결 풀 지표를 조회하고 카드와 추이 차트로 표시합니다. | 관리 대상뿐 아니라 모니터링 서비스의 요청 지연과 자원 상태도 확인하기 위해서입니다. |
+| 경보와 관리자 메일 | Prometheus 규칙으로 경보를 평가하고 Alertmanager가 발생·해소 알림을 내부 수신기로 전달합니다. 관리자 메일 등록 팝업과 선택형 SMTP 전송도 제공합니다. | 화면을 계속 보고 있지 않아도 수집 중단·오류 증가·상태 갱신 실패를 알 수 있도록 하기 위해서입니다. |
+| 통합 컨테이너 실행 | PostgreSQL·백엔드·웹·Keycloak·Prometheus·Alertmanager·알림 수신기를 의존 순서대로 실행합니다. | 개별 도구 설치와 설정 차이를 줄이고, 동일한 구성으로 시작·재시작할 수 있도록 하기 위해서입니다. |
+| Jenkins 통합 검증 | Git 커밋을 고정해 서버·프론트·실제 PostgreSQL·로그인/권한·이미지 빌드와 장애/해소 알림 경로를 검증합니다. | 코드 테스트뿐 아니라 인증·DB·컨테이너 설정의 조합에서 발생하는 문제를 배포 전에 확인하기 위해서입니다. |
 
-브라우저는 NGINX를 통해 Spring Boot API를 호출하고, 백엔드는 JPA로 허용 범위의 데이터만 조회합니다. Keycloak은 로그인·토큰 발급을 담당하며 API는 서명과 권한을 검증합니다. 운영 지표는 `Micrometer → Actuator → Prometheus → 고정 PromQL → 관리자 화면`으로 전달됩니다. 경보는 Alertmanager가 내부 수신기에 전달하며, SMTP 설정·활성화 후 관리자 메일로도 전송합니다.
+## 구현 과정에서 고려한 사항
 
-[전체 구성도](docs/PROJECT_ARCHITECTURE.md) · [API 명세](docs/API.md) · [인증·권한 설계](docs/AUTHENTICATION.md)
+- **첫 화면의 작업량 축소:** Cluster 첫 페이지를 우선 표시하고 상세·이력·운영 화면 모듈은 해당 화면에 들어갈 때 브라우저가 요청합니다. 전체 건수 집계가 첫 목록 표시를 지연시키지 않도록 요청을 분리했습니다.
+- **서버와 브라우저의 자원 상한:** DB 조회는 필요한 열과 최대 100개 응답으로 제한하고, 브라우저는 최근 500개 목록과 화면에 보이는 행만 유지합니다. 데이터 규모가 늘어도 전체 행 수에 비례해 DOM과 캐시가 늘어나지 않게 했습니다.
+- **5초 폴링:** 수초 단위로 상태를 확인하는 조회 화면이므로 기존 REST API를 재사용하는 폴링을 선택했습니다. 수동 갱신만으로 생기는 확인 공백을 줄이면서 별도 스트리밍 연결·재연결·이벤트 재전송을 관리하지 않습니다. 한 갱신이 끝난 뒤 5초 후 다음 갱신을 시작합니다.
+- **조회량 제한:** 현재 목록·펼친 계층·선택 상세만 다시 읽고 전체 리소스 건수는 반복 집계하지 않습니다. 탭이 숨겨지거나 오프라인이면 자동 요청을 중지합니다. 실패 시 10·20·40·60초로 재시도 간격을 늘리고 성공하면 5초로 복귀합니다.
+- **상태와 이력의 일치:** DB에 저장하는 리소스 상태·현재 이벤트·변경 이력을 하나의 트랜잭션으로 처리합니다. 저장 중 오류가 나면 해당 배치의 DB 변경을 롤백합니다. 변경 이력과 시계열은 보관량을 제한합니다.
+- **사용자별 조회 통제:** 서버가 JWT의 서명·발급자·역할을 확인하고 Cluster 접근 조건을 목록·상세·검색·집계에 적용합니다. 브라우저에서 다른 Cluster ID를 보내더라도 허용 범위를 벗어난 데이터를 조회할 수 없습니다.
+- **운영 지표와 경보:** Prometheus로 API 오류·응답 시간·DB 조회 지연·JVM 메모리·연결 풀을 수집합니다. 관리자 화면에서 현재 지표·추이·경보 상태를 확인하고 수집 중단·API 오류 증가·상태 갱신 실패가 경보 조건을 충족하면 Alertmanager가 내부 수신기와 등록된 관리자 메일로 발생·해소 알림을 전달합니다.
 
-### 대용량 처리 방식
+## 설계 문서 필수 포함 항목 4가지
 
-- **저장·조회:** Cluster 20 / Node 200 / Namespace 2,000 / Pod 150,000개를 실제 DB에 저장합니다. 별도 `scripts/seed.sql` 배치로 초기 적재하고, 서비스는 요청 시 PostgreSQL을 인덱스·keyset 페이지로 조회합니다. 부모·상태·ID 인덱스와 이름 검색용 `pg_trgm`을 사용하며 요청 때 전체 데이터를 생성하거나 메모리에 적재하지 않습니다.
-- **응답 제한:** 조건에 연결된 keyset 커서로 목록을 최대 100개씩 반환합니다. 전체 데이터 메모리 적재나 매 요청 전체 순회를 하지 않습니다.
-- **렌더링 제한:** 화면에 보이는 행만 렌더링하고 목록은 최근 5페이지·500개까지만 유지합니다. 임의 위치 점프가 아닌 순차 탐색입니다.
-- **갱신 제한:** 현재 조회창·펼친 계층·선택 상세만 폴링합니다. 숨김·오프라인에서 중지하고 실패 시 백오프합니다.
-- **변경 정합성:** Mock 상태 변경과 변경 이력을 한 트랜잭션으로 저장합니다. 이력은 24시간·최신 20,000개 기준으로 배치 정리합니다.
+### 프론트엔드 렌더링 전략
 
-[JPA 조회 설계](docs/JPA_QUERY_DESIGN.md) · [렌더링·캐시 설계](docs/FRONTEND_RENDERING.md) · [운영·보관 정책](docs/OPERATIONS_AND_DELIVERY.md)
+고정 높이 행을 사용하는 화면에 맞춰 스크롤 위치·행 높이로 표시 범위를 계산하고, 뷰포트 앞뒤 여유 행만 추가 렌더링합니다. 계층 자식은 펼칠 때 가져오며 목록 캐시는 최대 5페이지·500개, 계층 캐시는 24페이지·동시 펼침 8개로 제한합니다. 새 페이지를 받으면 오래된 캐시를 제거하면서 스크롤 위치를 보정합니다. 갱신은 기존 행 키·선택·스크롤을 유지하며 현재 화면에 필요한 데이터만 교체합니다.
 
-## 테스트와 성능 검증
+### 계층 데이터 모델링
 
-리소스 진단 V4 변경은 통합 검증·인증 환경 반영까지 완료했습니다. 기존 리소스·풀이/변경 이력과 계정 데이터 보존을 확인했으며, 일시적으로 발생한 구 이미지와 신규 seed 불일치는 WH-042에서 해결했습니다. 아래 성능 측정은 별도 조건·표본의 기록이며 전체 성능 목표 합격 여부와 구분합니다.
+계층의 종류와 깊이가 4단계로 고정되고 유형별 속성이 달라 **유형별 테이블과 직접 부모 외래키**로 설계했습니다. 유형별 필드·상태 제약을 각 테이블에 두고, 부모 ID 조건으로 하위 페이지를 조회합니다.
 
-```bash
-# Python·Git만 사용: 도구 회귀, 문서·소스 규칙, 공백 검사
-bash scripts/check.sh fast
-
-# Java 21·Node.js 22.12 이상 22.x·Docker 필요: 서버·실제 DB·프론트 테스트와 빌드
-bash scripts/check.sh full
+```mermaid
+flowchart LR
+  C["infrastructure_cluster"] -->|cluster_id| N["infrastructure_node"]
+  N -->|node_id| NS["infrastructure_namespace"]
+  NS -->|namespace_id| P["infrastructure_pod"]
+  P -->|pod_id| PC["infrastructure_pod_container"]
+  N -->|node_id| G["infrastructure_node_gpu"]
+  C -.-> RK["리소스 참조 키<br/>resource_type + resource_id"]
+  N -.-> RK
+  NS -.-> RK
+  P -.-> RK
+  RK -. "논리 참조 · 외래키 아님" .-> CE["resource_change_event"]
+  RK -. "논리 참조 · 외래키 아님" .-> KE["infrastructure_kubernetes_event"]
 ```
 
-실제 Keycloak 로그인·계정별 권한 E2E는 [실행 가이드](docs/RUNNING.md)의 별도 명령으로 검증합니다. Jenkins는 커밋 SHA를 고정한 독립 체크아웃에서 이미지·실제 API·인증·경보 복구까지 검사합니다. 최신 실행 범위와 이전 CI 결과는 [검증 기록](docs/PROJECT_GUIDE.md#현재-검증-결과)에서 구분합니다.
+실선은 DB 외래키 관계이고 점선은 `resource_type + resource_id`로 리소스 유형 중 하나를 가리키는 논리 관계입니다. 이벤트 조회에서는 실제 리소스와 사용자 권한을 다시 확인합니다.
 
-### 브라우저 반복 측정
+| 테이블 | 주요 열·제약 |
+|---|---|
+| `infrastructure_cluster` | `id` PK, 이름 UNIQUE, 상태, 갱신 시각 |
+| `infrastructure_node` | `id` PK, `cluster_id` FK, 이름/상태/갱신 시각, CPU·메모리 사용률·용량·할당 가능량·요청량. Cluster 안 이름 UNIQUE |
+| `infrastructure_namespace` | `id` PK, `node_id` FK, 이름/상태/갱신 시각. Node 안 이름 UNIQUE |
+| `infrastructure_pod` | `id` PK, `namespace_id` FK, 이름/상태/갱신 시각, 재시작 수·컨테이너 수·대표 이미지·워크로드 이름. Namespace 안 이름 UNIQUE |
+| `infrastructure_pod_container` | `id` PK, `pod_id` FK `ON DELETE CASCADE`, 이름·이미지·상태·준비 여부·재시작·CPU/메모리 요청/사용량. `(pod_id,name)` UNIQUE |
+| `infrastructure_node_gpu` | `id` PK, `node_id` FK `ON DELETE CASCADE`, 장치 이름·모델·메모리·사용률·온도·할당 Pod 수. `(node_id,device_name)` UNIQUE |
+| `infrastructure_kubernetes_event` | `id` PK, 유형·리소스 ID·경보 종류·reason/message·처음/최근 관측 시각·반복 수. 리소스별 현재 상태 이벤트 한 건을 `(resource_type,resource_id)`로 식별 |
+| `resource_change_event` | `id` PK, 유형·리소스 ID·변경 시각·이전/이후 상태·JSONB 속성. 현재 값과 별도로 변경 전후 기록 |
 
-2026-10-18 **단일 PostgreSQL·인증 관리자·15만 Pod·프로덕션 NGINX**에서 측정했습니다. Apple M1 Pro·RAM 16GiB, 자동 측정 Chrome **155.0.8059.80**, CPU **4×**, 캐시 **OFF**, 네트워크 제한 없음·1440×1000 조건입니다. 사용자의 현재 버전 진행 요청에 따른 검증이며 최신 Chrome 확인/업데이트 완료를 뜻하지 않습니다.
+이벤트와 변경 이력의 `resource_type + resource_id`는 여러 유형을 가리키는 다형 참조여서 단일 FK는 만들지 않았습니다. 조회 시 허용된 유형 테이블과 JOIN하고 리소스 존재 및 사용자 권한을 다시 확인합니다.
 
-20회마다 새 context에서 실제 PKCE 로그인 후 SSO 재진입·탐색을 측정합니다. DOM 결과 검증과 animation frame 2회를 포함하며, 검색의 250ms 디바운스는 제외합니다. FULL 모드에서는 Pod 1을 잠시 변경해 목록·상세 갱신을 확인한 뒤 원복합니다. 시작/종료와 재현 명령은 [측정 방법](docs/PERFORMANCE.md)에 있습니다. 빌드·E2E·네이티브 화면 검사와 겹치지 않은 두 번째 전체 실행 결과입니다.
+Node는 CPU·메모리 용량/할당량, Pod는 재시작·이미지 정보를 각 테이블의 타입 있는 열에 보관합니다. Pod 컨테이너와 Node GPU 장치는 별도 자식 테이블입니다. `infrastructure_kubernetes_event`는 선택 리소스의 현재 상태 이벤트 한 건을 보관하고, `resource_change_event`는 상태 전환 전후를 기록합니다. 부모 연결은 외래키, 부모 내부 이름 중복은 유일 제약으로 막습니다. Namespace는 이 과제의 Node별 탐색 단위이므로 같은 이름이 서로 다른 Node 아래 존재할 수 있습니다.
 
-| 동작 | 목표 | 중앙값 | P95 | 최댓값 | 목표 초과 |
-|---|---:|---:|---:|---:|---:|
-| SSO 재진입 | 500ms | 315.9ms | 533.1ms | 1,223.9ms | 2/20 |
-| 첫 계층 펼침 | 100ms | 44.1ms | 205.2ms | 226.9ms | 3/20 |
-| 접기 | 100ms | 26.8ms | 28.2ms | 29.5ms | 0/20 |
-| 캐시 재펼침 | 100ms | 27.7ms | 28.9ms | 30.7ms | 0/20 |
-| 이름 검색 | 300ms | 72.5ms | 192.6ms | 466.4ms | 1/20 |
-| 상태 필터 | 200ms | 46.0ms | 62.7ms | 124.1ms | 0/20 |
-| 변경 없는 새로고침 | 200ms | 74.9ms | 110.9ms | 671.0ms | 1/20 |
-| 실제 변경 새로고침 | 200ms | 76.8ms | 107.2ms | 316.0ms | 1/20 |
-| 실제 변경 자동 폴링 | 200ms | 118.2ms | 158.4ms | 158.4ms | 0/3 |
+목록 응답에 전체 자식 Entity를 포함하지 않습니다. 부모 관계 JOIN으로 경로와 Cluster 접근 범위를 구해 조회하며, 하위 데이터는 사용자가 펼쳤을 때 페이지 단위로 가져옵니다. 컨테이너·GPU 장치 정보는 해당 Pod/Node를 선택했을 때만 제한 조회합니다.
 
-**기능 오류는 0건이지만, 지연 목표 초과가 남아 전체 합격은 아닙니다.** 인증 모듈/설정 병렬 로딩·silent SSO·갱신 시각 처리 개선을 적용했습니다. 개선 전 5회·네이티브 검사와 겹친 첫 20회·별도 두 번째 20회 모두 [측정 표본](docs/performance/2026-10-18-final-auth.json)에 보존합니다. 단일 느린 표본에서 여러 API 대기가 함께 증가했으며 원인을 확정하지 않았습니다. 느린 표본 삭제·목표/준비 조건 완화는 하지 않았습니다.
+### 인덱스 및 쿼리 전략
 
-이후 계측 도구의 selector 보호를 재확인한 3회 smoke에서도 자동 갱신1회 초과가 관측됐습니다. 적은 표본을 위20회 결과 대신 사용하지 않으며 [모든 후속 결과와 남은 점검](docs/FINAL_PERFORMANCE_REVIEW.md)을 구분해 기록합니다.
+화면이 `다음 페이지`로 순차 탐색하고 임의 페이지 번호를 제공하지 않아 `id > 마지막으로 본 ID ORDER BY id LIMIT n+1` keyset 커서를 사용합니다. 깊은 페이지에서도 앞선 행을 OFFSET만큼 읽고 버리는 작업 없이 다음 범위부터 조회합니다. 새 행은 현재 커서 뒤에서 이어집니다. 페이지 번호를 직접 지정하거나 특정 위치로 점프하는 기능은 없습니다. 커서는 검색·상태·부모·Cluster·사용자 범위에 묶이며 조건 변경 시 새로 시작합니다. 이 방식은 여러 페이지를 하나의 DB snapshot으로 고정하지 않으므로 동시 변경이 있으면 페이지 간 결과가 한 시점의 스냅샷이라는 보장은 없습니다. `(부모 ID, ID)`는 기본 하위 목록을, `(부모 ID, 상태, ID)`는 상태 필터 목록을 지원합니다. 전체 상태 목록에는 `(상태, ID)`를 둡니다. PostgreSQL `pg_trgm` GIN 인덱스는 이름 중간 부분 검색에, 자식 상세는 부모 ID 인덱스에 사용합니다. 현재 이벤트 조회는 `(resource_type, resource_id, last_seen DESC)`와 최신 시각 인덱스를 사용합니다.
 
-- 스크롤: 실제 15만 데이터에서 캐시 500개·표시 19행, 4초 CDP DrawFrame **59.8fps**. 보조 합성 프레임이며 가이드의 **Chrome FPS 미터 직접 검증은 남아 있습니다**.
-- 탭 메모리: 실제 Chrome 작업관리자 **74.3MB**(참고 목표 300MB). GUI Chrome153·500개 캐시·DevTools 종료 상태의 별도 관측으로, CPU4× 반복 결과와 동일 조건은 아닙니다.
-- 기능 회귀: 리소스 진단 추가 후 서버 **140개**, 프론트 **96개**, 실제 Keycloak E2E **14개** 통과. [진단 검증](docs/RESOURCE_DIAGNOSTICS.md)에 DB 이행·권한·모바일 결과를 정리했습니다. [경보 메일](docs/ALERT_EMAIL.md)은 관리자 팝업 UI와 합성 firing/resolved SMTP 전달을 확인했습니다. SMTP 서버의 수락 확인이며 편지함 도착/열람은 확인하지 않았습니다.
+JPA/Hibernate DTO projection으로 필요한 열만 읽고, `limit + 1`개를 조회해 전체 count 없이 다음 페이지 존재 여부를 판단합니다. 응답은 최대 100개이며 Entity 그래프 로딩을 피합니다. 실제 PostgreSQL 통합 테스트에서 목록 SQL 횟수와 Entity 로딩 0건을 확인했고, 선택적 이름 검색에서 `pg_trgm` 인덱스가 사용되는 실행 계획을 확인했습니다.
+
+### API 설계
+
+목록은 공통 요약 정보만 반환하고, 유형별 진단 속성과 경로는 선택한 리소스의 상세 응답에서 제공합니다. 검색 결과에는 조상 경로를 함께 반환해 결과마다 경로 API를 다시 호출하는 요청 증가를 줄였습니다.
+
+리소스 변경 이력은 `GET /api/resources/{type}/{id}/events`, 현재 상태 이벤트는 `GET /api/resources/{type}/{id}/kubernetes-events?limit=20`에서 조회합니다. 이벤트 목록은 최대 20개이며, 사용자별 Cluster 권한을 다시 확인합니다.
+
+다음 페이지 응답의 `nextCursor`는 마지막 조회 위치를 나타내는 값입니다. 클라이언트가 이를 다음 요청에 보내면 서버는 그 뒤의 데이터를 조회합니다. 검색·상태·부모·Cluster 범위나 로그인 계정이 바뀌면 이전 커서를 사용할 수 없습니다. 다른 조건이나 다른 계정의 커서를 재사용하면 거부하며, 요청 파라미터와 별개로 모든 쿼리에 서버가 확인한 권한을 적용합니다. 오류는 ProblemDetail로 통일하고 잘못된 입력 400·조회 불가 404·저장소 장애/시간 초과 503을 구분합니다. 리소스 상세와 상태 이벤트 조회도 같은 사용자별 Cluster 범위를 확인합니다.
+
+## 성능 측정 결과
+
+프로덕션 빌드·PostgreSQL의 150,000 Pod·관리자 인증 화면에서 측정했습니다. Apple M1 Pro/16GB, **Chrome 155.0.8059.80의 DevTools Performance 탭·CPU 4× slowdown·캐시 비활성화·네트워크 제한 없음** 조건입니다.
+
+첫 화면은 인증 복귀 문서의 navigation 시작부터 Cluster 목록이 표시되어 조작 가능한 시점까지입니다. 첫 목록 표시 후 사용자 표시 정보·계층 루트·전체 건수를 조회해 초기 작업을 분산했습니다. 계층은 클릭부터 하위 행 표시/제거까지, 검색은 디바운스 이후 요청부터 결과 표시까지, 필터는 선택 확정부터 결과 표시까지 측정했습니다. 갱신은 클릭/폴링 요청부터 목록·선택 상세 반영까지이며 5초 폴링 대기 시간은 제외합니다. 각 종료점에서 두 animation frame을 확인하고 User Timing을 Performance의 Timings 트랙에 표시했습니다.
+
+| 항목 | 목표 | Chrome Performance 기록값 | 판정 |
+|---|---:|---:|---|
+| 인증 복귀 후 첫 Cluster 목록 | 500ms | 459.30ms | 충족 |
+| 최초 계층 펼침(네트워크 포함) | 100ms | 87.80ms | 충족 |
+| 캐시된 계층 재펼침 | 100ms | 48.40ms | 충족 |
+| 계층 접기 | 100ms | 37.98ms | 충족 |
+| 이름 검색 | 300ms | 134.85ms | 충족 |
+| 상태 필터 | 200ms | 172.60ms | 충족 |
+| 변경 없는 새로고침 | 200ms | 57.96ms | 충족 |
+| 상태 변경 후 새로고침 | 200ms | 122.10ms | 충족 |
+| 상태 변경 후 자동 갱신 | 200ms | 75.90ms | 충족 |
+
+표의 값은 아래 Chrome Performance 원본에 표시된 이벤트 Duration입니다. 첫 화면·최초 펼침·검색·필터는 1080×1288, 나머지는 1080×1769 뷰포트에서 기록했습니다. 최초 펼침은 네트워크 요청을 포함합니다. 변경 갱신은 목록과 선택 상세의 상태 일치 및 목록 공백이 발생하지 않는 것을 확인하고 테스트 DB 값을 복원했습니다.
+
+| 화면·자원 측정 | 결과 |
+|---|---|
+| Chrome FPS 미터 | 15초 스크롤 중 시작·중간·후반 91.2 / 97.2 / 96.0fps |
+| 15초 스크롤 보조 계측 | RAF 평균 87.68fps, 1초 구간 최저 69fps |
+| Chrome 작업 관리자 | 대상 탭 90.8MB, 참고 기준 300MB 이하 |
+
+FPS 미터는 세 시점의 직접 관측이며, RAF는 별도 보조 지표입니다. 미터의 전체 구간 최솟값을 저장한 결과는 아닙니다. 작업 관리자 메모리도 별도 시점의 스냅샷입니다.
 
 <details>
-<summary>실제 Chrome Performance 패널 캡처</summary>
+<summary>Chrome DevTools 목표별 원본 캡처</summary>
 
-![Chrome Performance 실제 타임라인](docs/images/chrome-performance-final-20261018.jpg)
+CPU 4×와 캐시 비활성 조건:
+![Chrome CPU 4배 감속과 캐시 비활성](docs/images/chrome-devtools-20261018/00-cpu4-cache-off.jpg)
 
-현재 실행 중인 GUI Chrome153에서 CPU4×·캐시 OFF를 설정한 후 실제 초기 로드를 기록했습니다. 네이티브/확장 계측 비용을 포함한 단일 타임라인으로, 반복 측정이나 전체 목표 합격을 대신하지 않습니다. [캡처 조건·한계](docs/CHROME_PERFORMANCE_CAPTURE.md)
+최초 Cluster 목록:
+![첫 Cluster 목록 459.30ms](docs/images/chrome-devtools-20261018-recheck/01-first-cluster-list.jpg)
 
-![Chrome 작업관리자 실제 탭 메모리](docs/images/chrome-task-memory-20261018.jpg)
+계층 펼침·접기:
+![최초 계층 펼침 87.80ms](docs/images/chrome-devtools-20261018-recheck/02-tree-cold-expand-run3.jpg)
+![캐시 재펼침 48.40ms](docs/images/chrome-devtools-20261018/02-tree-expand.jpg)
+![계층 접기 37.98ms](docs/images/chrome-devtools-20261018/03-tree-collapse.jpg)
+
+검색·필터:
+![이름 검색 134.85ms](docs/images/chrome-devtools-20261018-recheck/04-name-search.jpg)
+![상태 필터 172.60ms](docs/images/chrome-devtools-20261018-recheck/05-status-filter.jpg)
+
+수동·자동 갱신:
+![변경 없는 새로고침 57.96ms](docs/images/chrome-devtools-20261018/06-manual-refresh.jpg)
+![상태 변경 새로고침 122.10ms](docs/images/chrome-devtools-20261018/07-changed-refresh.jpg)
+![자동 변경 갱신 75.90ms](docs/images/chrome-devtools-20261018/08-automatic-changed-refresh.jpg)
+
+스크롤·메모리:
+![스크롤 시작 FPS 미터](docs/images/chrome-devtools-20261018-recheck/09-fps-start.jpg)
+![스크롤 중간 FPS 미터](docs/images/chrome-devtools-20261018-recheck/09-fps-middle.jpg)
+![스크롤 후반 FPS 미터](docs/images/chrome-devtools-20261018-recheck/09-fps-end.jpg)
+![Chrome 작업 관리자 탭 메모리](docs/images/chrome-devtools-20261018/10-chrome-task-memory.jpg)
 
 </details>
 
-## 범위와 문서
+### 반복 검증
 
-실제 Kubernetes API·공개 HTTPS 운영 배포는 포함하지 않습니다. 내부 수신기는 최근 200개 이벤트를 메모리에 보관합니다. [관리자 경보 메일](docs/ALERT_EMAIL.md)은 로컬 SMTP·수신 주소·명시적 활성화가 모두 설정돼야 전송됩니다. 합성 경보의 발생·해소 메일이 SMTP 서버에 각각 수락된 것을 확인했으며 최종 편지함 도착/열람은 확인하지 않았습니다. SMS·외부 AI·클라우드 API는 사용하지 않습니다.
+Chrome155.0.8059.85·1440×1000·CPU4×·캐시 비활성 조건에서 실제 PKCE 로그인과 ADMIN의15만 Pod 조회를 확인했습니다. 자동 반복20회에서 모든 응답 목표를 충족했고 API 오류·측정 오류는0건입니다. 자동 변경 갱신은3회이며 테스트 DB 상태·시각 복원을 완료했습니다. 이 반복 통계는 위 Chrome Performance 원본 이벤트 기록과 구분합니다.
 
-| 문서 | 내용 |
-|---|---|
-| [실행 가이드](docs/RUNNING.md) | 인증 시연·개발·비인증 Compose·검증 명령·문제 해결 |
-| [프로젝트 기준 문서](docs/PROJECT_GUIDE.md) | 전체 기능·구조·기술 선택·현재 검증 상태 |
-| [요구사항 대조](docs/REQUIREMENTS_AND_HARDENING_REVIEW.md) | 과제 요구와 구현 범위·제약 |
-| [운영 관측·경보](docs/ALERTING_AND_RECOVERY.md) | 경보 조건·전달 경로·복구 검증 |
-| [CI 재현성](docs/CI_REPRODUCIBILITY.md) | Jenkins·커밋 고정·이미지/컨테이너 검증 |
-| [개발 가이드](docs/DEVELOPMENT_GUIDE.md) | 코드·보안·테스트·문서 동기화 규칙 |
-| [작업 이력](docs/WORK_HISTORY.md) | 구현·검증·시행착오와 후속 작업 |
+<details>
+<summary>20회 반복 검증 결과</summary>
+
+| 항목 | 표본 | P95 | 최댓값 | 판정 |
+|---|---:|---:|---:|---|
+| 첫 화면(SSO 포함) | 20 | 268.99ms | 272.75ms | 충족 |
+| 인증 복귀 후 목록 | 20 | 164.70ms | 172.60ms | 충족 |
+| 최초 계층 펼침 | 20 | 58.10ms | 60.70ms | 충족 |
+| 접기 | 20 | 28.90ms | 29.00ms | 충족 |
+| 캐시 재펼침 | 20 | 29.60ms | 30.00ms | 충족 |
+| 검색 | 20 | 67.30ms | 69.00ms | 충족 |
+| 필터 | 20 | 49.40ms | 50.30ms | 충족 |
+| 새로고침 | 20 | 74.90ms | 91.50ms | 충족 |
+| 변경 반영 새로고침 | 20 | 62.00ms | 62.00ms | 충족 |
+| 변경 반영 자동 갱신 | 3 | 58.20ms | 58.20ms | 충족 |
+
+10초 스크롤 보조 계측은 compositor59.92fps·RAF평균60.00fps·1초 구간 최저60fps였고, 표시 DOM은19행입니다. native FPS 미터·작업 관리자 결과와 별도로 기록했습니다.
+
+</details>
+
+자동 반복 검증은 다음 명령으로 실행합니다.
+
+```bash
+PERF_BROWSER=chrome PERF_FULL=1 PERF_REPETITIONS=20 PERF_LABEL=<새-이름> python3 scripts/test-auth.py --performance
+```
+
+## 아쉬운 점 및 개선하고 싶은 부분
+
+- **실제 인프라 지표 수집:** 실제 운영 경로에서는 생성 데이터 시뮬레이터를 함께 켜지 않고 Kubernetes API의 현재 상태/요청 정의, kubelet/cAdvisor의 CPU·메모리 시계열, DCGM Exporter의 GPU 시계열로 대체합니다. Cluster/Node/Namespace/Pod 식별자를 일관된 label로 맞추고 scrape 성공·최근 수집 시각·대상별 오류를 화면에서 확인합니다. 시계열은 Prometheus, 리소스 관계·권한 정보는 서비스 DB에서 조회합니다.
+- **운영 알림함:** Alertmanager 알림을 화면 상단 종 아이콘과 미확인 건수로 보여주고, 발생/해소 시각·심각도·대상 리소스·읽음/확인 상태를 저장하는 기능을 추가할 수 있습니다. 알림을 선택하면 해당 리소스 상세로 이동합니다. 현재 내부 수신기는 최근 알림을 프로세스 메모리에 보관하므로, 화면을 닫거나 서버가 재시작된 뒤에도 다시 확인할 수 있도록 알림 DB 저장과 Alertmanager fingerprint 기반 중복 수신 처리가 먼저 필요합니다. 메일은 보조 전달 채널로 둡니다.
+- **계정 운영:** 현재 로컬 계정은 미리 만든 세 계정만 제공하고 가입·비밀번호 재설정·프로필 변경은 지원하지 않습니다. 실제 조직에서는 사용자·조직 동기화, 계정 비활성화, 역할·Cluster 범위 변경 이력, 변경 권한을 관리자에게 제한하는 절차를 추가합니다.
+- **조회량 확장:** 현재 15만 Pod에서 집계·검색을 실제 DB로 확인했습니다. 데이터 규모와 동시 사용자가 늘어날 때는 Cluster 집계와 짧은 검색어의 실행 계획, 데이터 갱신 중 페이지 이동 결과를 다시 측정하고 병목이 확인된 항목만 별도 집계나 검색 정책으로 조정합니다.
+- **관측 대상 확장:** 현재 Prometheus는 Spring Boot 지표를 수집합니다. 운영 단계에서 PostgreSQL, Keycloak, 호스트·컨테이너와 실제 Kubernetes/GPU collector까지 함께 감시하면 요청 지연의 원인을 앱·DB·인프라 수집 경로로 나눠 볼 수 있습니다.

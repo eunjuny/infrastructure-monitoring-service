@@ -1,0 +1,128 @@
+{
+  "date": "2026-10-18",
+  "run": "per-goal-evidence-20261018",
+  "environment": {
+    "browser": "Chrome 155.0.8059.80",
+    "host": "Apple M1 Pro, 16 GB",
+    "viewport": "1440x1000",
+    "cpuThrottle": "4x",
+    "cacheDisabled": true,
+    "networkThrottle": "none",
+    "dataset": {
+      "clusters": 20,
+      "nodes": 200,
+      "namespaces": 2000,
+      "pods": 150000
+    }
+  },
+  "validation": {
+    "iterations": 20,
+    "verifiedIterations": 20,
+    "apiHttpErrors": 0,
+    "measurementErrors": 0,
+    "podFixtureRestored": true
+  },
+  "measurementsMs": {
+    "credentialLoginSubmit": {
+      "target": null,
+      "median": 332.12,
+      "p95": 387.83,
+      "max": 492,
+      "note": "Diagnostic only; excludes typing and is not included in the resource-screen interaction target gate."
+    },
+    "ssoNavigation": {
+      "target": 500,
+      "median": 211.195,
+      "p95": 284.9,
+      "max": 290.51,
+      "overTarget": 0
+    },
+    "callbackReady": {
+      "target": 500,
+      "median": 144,
+      "p95": 200.3,
+      "max": 211.8,
+      "overTarget": 0
+    },
+    "expandCold": {
+      "target": 100,
+      "median": 44.2,
+      "p95": 56.7,
+      "max": 60.3,
+      "overTarget": 0
+    },
+    "collapse": {
+      "target": 100,
+      "median": 28.25,
+      "p95": 30.2,
+      "max": 37,
+      "overTarget": 0
+    },
+    "expandWarm": {
+      "target": 100,
+      "median": 29.35,
+      "p95": 30.4,
+      "max": 31.5,
+      "overTarget": 0
+    },
+    "search": {
+      "target": 300,
+      "median": 62.6,
+      "p95": 78.7,
+      "max": 232.6,
+      "overTarget": 0
+    },
+    "filter": {
+      "target": 200,
+      "median": 46.15,
+      "p95": 57.9,
+      "max": 62.7,
+      "overTarget": 0
+    },
+    "refreshReadOnly": {
+      "target": 200,
+      "median": 60,
+      "p95": 63.4,
+      "max": 76.8,
+      "overTarget": 0
+    },
+    "refreshChanged": {
+      "target": 200,
+      "median": 45.8,
+      "p95": 77.3,
+      "max": 112.5,
+      "overTarget": 0
+    },
+    "pollChanged": {
+      "samples": 3,
+      "target": 200,
+      "median": 72.2,
+      "p95": 87.9,
+      "max": 87.9,
+      "overTarget": 0,
+      "note": "Three automatic-refresh observations; this is not a long-duration stability test."
+    }
+  },
+  "scroll": {
+    "durationMs": 10014.1,
+    "visibleRows": 19,
+    "cdpDrawFrameFps": 59.9671,
+    "rafFps": 60.0022,
+    "minOneSecondRafFps": 60,
+    "framesOver18ms": 0,
+    "targetFps": 55,
+    "method": "10-second supplementary CDP compositor and requestAnimationFrame measurement; not a native Chrome FPS-meter reading."
+  },
+  "separateObservations": {
+    "chromeTaskManagerTabMemoryMb": 74.3,
+    "memoryConditions": [
+      "Chrome 작업 관리자",
+      "Pod 150,000개 화면",
+      "목록 캐시 500개",
+      "DevTools 종료 상태",
+      "단일 시점 관측",
+      "CPU 4× 반복 측정과 별도"
+    ],
+    "memoryNote": "Direct Chrome Task Manager observation; 150k resource view, 500-row cache, DevTools closed; separate single snapshot from CPU-throttled repetition run."
+  }
+}

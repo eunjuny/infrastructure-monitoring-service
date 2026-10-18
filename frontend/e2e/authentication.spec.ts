@@ -60,7 +60,7 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
       const detail = await (await received).json()
       const diagnostics = page.locator('.resource-diagnostics')
       await expect(diagnostics).toBeVisible()
-      await expect(diagnostics).toContainText('Mock')
+      await expect(diagnostics).not.toContainText('Mock')
       const data = detail.attributes
       if (type === 'Cluster') {
         await expect(diagnostics).toContainText(`${data.readyNodeCount} / ${data.nodeCount}`)
@@ -120,8 +120,8 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
     await page.setViewportSize(viewport)
     await login(page, 'admin')
     await expect(page.locator('.cards')).toContainText('150,000')
-    await expect(page.locator('.window-statuses')).toContainText('조회된 100개 기준')
-    await expect(page.locator('.console-footer')).toContainText('Mock 데이터 · 읽기 전용')
+    await expect(page.locator('.window-statuses')).toContainText('조회된 20개 기준')
+    await expect(page.locator('.console-footer')).toContainText('읽기 전용')
     await expect(page.getByText('서버에서 ID 순서대로 조회합니다.', { exact: true })).toHaveCount(0)
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
     await page.getByRole('button', { name: '운영 관측', exact: true }).click()
@@ -131,7 +131,7 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
     await page.locator('.simulator-metrics > summary').focus()
     await page.keyboard.press('Enter')
     await expect(page.locator('.simulator-metrics')).toHaveAttribute('open', '')
-    await expect(page.locator('dl[aria-label="Mock 시뮬레이터 지표"] > div')).toHaveCount(3)
+    await expect(page.locator('dl[aria-label="상태 갱신 배치 지표"] > div')).toHaveCount(3)
     await page.locator('.simulator-metrics > summary').press('Enter')
     await expect(page.locator('.simulator-metrics')).not.toHaveAttribute('open')
     await expect(page.locator('.alert-rules > li')).toHaveCount(3)

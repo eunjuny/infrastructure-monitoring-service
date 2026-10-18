@@ -2,7 +2,7 @@
 
 ## 공통 환경
 
-2026-10-18 재검증은 사용자의 현재 버전 진행 요청에 따라 자동 측정 Chrome 155.0.8059.80과 네이티브 GUI 프로세스 153.0.8010.53을 구분합니다. 업데이트 후 최신 Chrome에서 재검증한 것으로 표시하지 않습니다. 아래 과거 자료의 버전 표기는 당시 기록이며 이번 네이티브 캡처의 버전 근거로 재사용하지 않습니다.
+현재 반복 측정 환경은 Apple M1 Pro·RAM16GB, Chrome155.0.8059.85, 1440×1000, CPU4× throttling·캐시 OFF·네트워크 제한 없음입니다. Performance 패널과 작업관리자 캡처의 도구·조건은 [캡처 자료](CHROME_PERFORMANCE_CAPTURE.md)에 별도로 기록합니다.
 
 프로덕션 빌드, 최신 Chrome, CPU 4x throttling, 브라우저 캐시 비활성화를 적용합니다. 서버·DB는 기동된 상태이며 초기 데이터 생성 시간과 서버 시작 시간은 브라우저 진입 목표에 포함하지 않습니다. 실제 기기 사양, Chrome 버전, 데이터 규모, 브라우저 확대율과 화면 크기를 기록합니다. 2026-10-14의 실제 측정과 개선 전후 결과는 [성능 검증 보고서](PERFORMANCE_RESULTS.md)에 기록했습니다.
 
@@ -20,11 +20,15 @@
 
 ## 측정 자료
 
-현재 기준은 [2026-10-18 메일/인증 개선 후 재검증](FINAL_PERFORMANCE_REVIEW.md)과 [5회 기준선·20회×2 전체 표본](performance/2026-10-18-final-auth.json)입니다. 실제 변경값 갱신·Pod 원복·작업관리자 관측을 추가했으나 일부 지연 목표와 가이드 FPS 미터 검증은 남았으므로 전체 합격은 아닙니다. 아래 수치는 이전 작업의 근거로 보존합니다.
+현재 기준은 WH-051 [최종 검증](FINAL_PERFORMANCE_REVIEW.md)입니다. Chrome155.0.8059.85·CPU4×/cache OFF·15만 Pod·실제 ADMIN의20회 반복에서 모든 응답 목표를 충족했습니다. [Chrome Performance 원본](CHROME_PERFORMANCE_CAPTURE.md)은 개별 이벤트 Duration을 보여주며 반복 통계와 별도로 유지합니다. native FPS 관측과 CDP/RAF 보조 계측도 구분합니다.
+
+아래 이전 기준은 `per-goal-evidence-20261018`의 20회 반복입니다. Chrome 155.0.8059.80·인증 Compose·15만 리소스·CPU4x/cache OFF에서 첫 화면, 펼침/접기, 검색, 필터, 변경 없는/변경 반영 갱신이 모두 목표 내였고 API 오류·측정 오류는 0건이었습니다. 자동 변경 갱신은 3회로 따로 기록합니다. 측정용 Pod 1은 원래 상태/시각으로 복원됐습니다. [현재 결과와 판정](FINAL_PERFORMANCE_REVIEW.md)을 기준으로 합니다.
+
+동일 버전의 앞선 반복에서는 단발 지연 초과가 있었고 한 차례는 브라우저 전환 중 취소된 요약 응답을 측정 도구가 오류로 오인했습니다. 이 실행들은 원본을 보존하며 최종 통과 실행과 섞거나 실패를 삭제하지 않습니다. 마지막 반복은 수정된 계측으로 20회 모두 통과했습니다. 스크롤 CDP 수치와 Chrome 작업관리자 메모리는 해당 도구의 직접 UI 지표와 조건이 다르므로 각각 보조/별도 측정으로 표시합니다.
 
 실제 설치 Chrome 155.0.8059.80에서 CPU4x/cache OFF로 로그인 후 펼침·검색을 기록한 [Performance 패널 원본 캡처](CHROME_PERFORMANCE_CAPTURE.md)를 README에 추가했습니다. 이는 WH-037 이후 단일 DB 서버 환경의 단일 상호작용 기록이며 아래 반복 측정이나 전체 합격/메모리 판정과 다릅니다. 기록 범위 Total과 INP를 가이드의 개별 동작 완료 시간으로 대체하지 않습니다.
 
-2026-10-18 제출 화면 정돈 후 현재 인증 Compose/15만 Pod·CPU4x/cache OFF의 읽기 전용 관리자 성능을 20회씩 두 번 확인했습니다. 기능/측정 오류는 없지만 두 실행 모두 일부 목표 초과가 있어 **현재 전체 성능 합격으로 판정하지 않습니다**. 두 번째 실행에서 SSO 재진입/콜백은 20회 모두 500ms 이내였으나 첫 펼침 2회(최대 161.9ms/목표 100), 검색 1회(514.1ms/300), 읽기 전용 갱신 1회(297.5ms/200)가 초과했습니다. 캡처가 겹친 첫 실행도 제거하지 않으며 두 번째 결과로 덮어쓰지 않습니다. 원인을 확정하지 않았고 다음 제출 전에는 지연 표본의 API/DB/브라우저 구간 분석과 최신 Chrome Performance 기록이 필요합니다. [환경·두 실행 요약·한계](performance/2026-10-18-submission-ui.json)를 참고합니다. 아래 과거 합격 결과와 다른 시점/환경입니다.
+2026-10-18 화면 정돈 후 실행한 [이전 20회×2 결과](performance/2026-10-18-submission-ui.json)는 일부 목표를 초과했습니다. 실패 사례를 보존하되 현재 판정은 최종 성능 보고서의 WH-048 실행을 따릅니다. 그 실행과 이후 결과는 코드/환경/측정 도구가 달라 엄밀한 전후 속도 개선률을 뜻하지 않습니다.
 
 현재 기본 seed는 15만 Pod입니다. 기존 10만 설치의 소속/상태를 유지한 확장과 이번 초기 진입·API 집중 측정은 [15만 확장 검증](DATA_SCALE_150K.md)에 기록합니다. 기존 일반/인증/프로파일 스크립트의 준비 건수는 150,000으로 갱신했으며 아래 과거 원본·FPS·메모리 자료를 15만 측정으로 바꾸지 않습니다.
 
@@ -39,6 +43,10 @@
 - 쿼리 실행 계획과 반환 행 수
 
 Playwright 실행 시간이나 API 응답 시간만으로 브라우저 성능 목표 달성을 주장하지 않습니다. 아래 자동 측정은 실제 DOM 조건 충족 뒤 두 번의 requestAnimationFrame을 기다려 화면 반영 기회를 포함합니다. 광학적 표시 시점의 직접 측정은 아니며 로딩 표시만으로 종료하지 않습니다.
+
+## User Timing 계측 경계
+
+첫 화면과 계층은 제품 코드의 고정 이름 measure를 실제 Performance 트랙에서 선택합니다. 첫 화면의 start=0은 최종 인증 복귀 문서 navigation이며, click부터 결과 표시까지 두 RAF로 확인합니다. 이전 같은 이름의 measure를 제거하고 이벤트 해제 시 예약 작업도 취소해 누적량을 제한합니다. 테스트 전용 DOM observer/스크롤 driver는 제품 번들에 포함하지 않습니다. Record를 누른 직후의 Initializing tracing 상태에서 동작을 시작하지 않고 Tracing 상태를 먼저 확인합니다. 캡처에서는 drawer를 닫고 Duration이 실제로 보이는지 확인합니다.
 
 ## 재현 명령과 측정 경계
 
@@ -60,9 +68,10 @@ PERF_LABEL=local-check npm run test:performance
 ```
 
 - 각 탐색 시나리오를 20회 반복하며 `PERF_REPETITIONS`로 3~50회를 선택할 수 있습니다. 새 브라우저 context·캐시 OFF·CPU 4x를 적용합니다. 같은 Chromium 프로세스를 재사용하므로 첫 V8·브라우저 초기화와 이후 탐색은 구분해 기록합니다.
-- 최초 진입은 navigation부터 Cluster 루트·Pod 첫 목록·전체 건수의 표시까지 측정합니다. Cluster만의 표시 시점도 별도 기록합니다. 펼침은 네트워크 포함 첫 요청과 캐시 재사용을 나눕니다.
+- 최초 진입은 navigation부터 첫 Cluster 목록 행이 표시되고 목록이 유휴 상태가 된 뒤 두 번의 animation frame을 지난 시점까지 측정합니다. 전체 건수·관리자 식별 표시 등 화면 보조 데이터는 최초 목록 준비 조건과 분리해 각 API 응답 지연을 기록합니다. 펼침은 네트워크 포함 첫 요청과 캐시 재사용을 나눕니다.
 - 검색은 250ms 디바운스를 제외한 요청 시작부터, 필터·수동 갱신은 UI 이벤트 시작부터 실제 변경 결과 표시까지 측정합니다. 변경 없는 화면을 갱신 완료로 판단하지 않습니다.
-- 5페이지·500개 창의 갱신도 따로 20회 측정합니다. 스크롤은 4초 연속 수행하며 CDP trace의 `DirectRenderer::DrawFrame` 수·시각으로 합성 프레임률을 계산하고 RAF 간격과 함께 기록합니다. 하드웨어 디스플레이의 실제 표시 프레임률과 같다고 주장하지 않습니다.
+- 5페이지·500개 창의 갱신도 따로 20회 측정합니다. 스크롤은 최종 응답 반복에서 10초 연속 수행하며, 1초 구간별 RAF 최저 FPS와 CDP trace의 `DirectRenderer::DrawFrame` 프레임률을 기록합니다. 현재 요약은 CDP compositor 59.97fps, RAF 평균/최저 1초 구간 60/60fps, 18ms 초과 RAF 0회, 화면 DOM 19행입니다. 이 스크롤은 한 차례 실행한 보조 측정이며 20회 FPS 반복이나 Chrome FPS 미터 직접 측정이라고 보지 않습니다.
+- 펼침·접기·검색·필터·수동/자동 갱신은 테스트 브라우저의 `performance.mark()`/`performance.measure()`로 각 동작 경계를 기록하고, DOM 결과와 두 번의 animation frame을 확인한 뒤 표본을 저장합니다. 이 마크는 검증 스크립트가 넣는 값이며 서비스 코드·운영 화면에는 포함되지 않습니다. 최초 SSO navigation은 문서 이동을 가로지르므로 자동화 시각으로 별도 측정하고, callback 뒤 화면 준비는 User Timing으로 보조 기록합니다.
 - 추가 100페이지·10,000개 순차 탐색에서 DOM·500개 캐시·JS heap·renderer RSS를 25페이지마다 기록합니다. 강제 GC 결과는 별도 보조 값이며 일반 메모리 사용량으로 대체하지 않습니다. RSS와 JS heap은 Chrome 작업관리자의 탭 메모리와 다른 지표입니다.
 - 원본 JSON·trace는 `frontend/.validation/performance/`에 생성됩니다. 핵심 결과와 SQL 실행 계획 요약은 보고서에 보관합니다. 실패를 제거하지 않고 오류·목표 초과 횟수를 함께 남깁니다.
 
@@ -74,6 +83,20 @@ docker compose exec -T db psql -U monitoring -d monitoring -v ON_ERROR_STOP=1 < 
 
 ## 추가 검색·계층·자동 갱신 측정
 
+### 2026-10-18 최종 인증 화면 20회 측정
+
+최종 재현 명령:
+
+```bash
+PERF_BROWSER=chrome PERF_FULL=1 PERF_REPETITIONS=20 \
+  PERF_LABEL=per-goal-evidence-20261018 \
+  python3 scripts/test-auth.py --performance
+```
+
+Chrome 155.0.8059.80·Apple M1 Pro/16GB·인증 Compose·1440×1000·네트워크 제한 없음에서 실제 Keycloak PKCE 로그인과 관리자 권한/15만 리소스를 매 반복 확인했습니다. 첫 화면 SSO 포함은 중앙값211.2ms·P95 284.9ms·최대290.5ms, callback 뒤 화면 준비는 144.0/200.3/211.8ms입니다. 첫 펼침44.2/56.7/60.3ms, 접기28.3/30.2/37.0ms, 검색62.6/78.7/232.6ms, 필터46.2/57.9/62.7ms, 변경 없는 갱신60.0/63.4/76.8ms, 변경 갱신45.8/77.3/112.5ms, 자동 변경 갱신72.2/87.9/87.9ms(별도 3회)입니다. 모든 응답 목표 초과·API 오류·측정 오류는 0건이며 테스트용 Pod 상태/시각도 복원됐습니다. 자세한 표는 [최종 검토](FINAL_PERFORMANCE_REVIEW.md)와 [실제 표본 요약](performance/2026-10-18-final-submission.json)에 있습니다.
+
+비밀번호 제출을 포함한 전체 인증 시간은 별도 진단이며 화면 동작 목표와 합산하지 않습니다. 서버 부팅/seed 시간·다중 사용자 부하·Chrome FPS 미터 직접 관측을 주장하지 않습니다. Chrome 작업관리자 탭 메모리 74.3MB는 별도 시점의 직접 관측입니다. 과거 실패/초과 표본은 [최종 검토](FINAL_PERFORMANCE_REVIEW.md)와 [작업 이력](WORK_HISTORY.md)에 보관합니다.
+
 ### 현재 인증 환경의 전체 보조 측정
 
 프로젝트 루트에서 실행합니다. 빌드·다른 브라우저 검사와 겹치지 않게 실행하고 실제 사용자 프로그램은 임의 종료하지 않습니다.
@@ -82,11 +105,11 @@ docker compose exec -T db psql -U monitoring -d monitoring -v ON_ERROR_STOP=1 < 
 PERF_BROWSER=chrome PERF_FULL=1 PERF_LABEL=auth-full-check PERF_REPETITIONS=20 python3 scripts/test-auth.py --performance
 ```
 
-`PERF_BROWSER=chrome`은 설치된 Chrome 채널, 생략 시 번들 Chromium입니다. CPU4x·캐시 OFF·네트워크 제한 없음·1440×1000이며 서버가 기동된 상태에서 매회 새 브라우저 context로 실제 관리자 PKCE 로그인을 수행합니다. 비밀번호 제출부터와 기존 SSO 재진입을 분리하고, 준비 완료는 Cluster뿐 아니라 Pod 첫 페이지·전체 집계·관리자 표시와 2회의 animation frame까지 포함하는 기존 조건을 유지합니다. 로그인 정보를 주입하거나 목표를 완화하지 않습니다.
+`PERF_BROWSER=chrome`은 설치된 Chrome 채널, 생략 시 번들 Chromium입니다. CPU4x·캐시 OFF·네트워크 제한 없음·1440×1000이며 서버가 기동된 상태에서 매회 새 브라우저 context로 실제 관리자 PKCE 로그인을 수행합니다. 비밀번호 제출부터와 기존 SSO 재진입을 분리합니다. 과제의 최초 화면 항목은 첫 Cluster 목록 행·목록 유휴 상태·2회의 animation frame으로 판정하며, summary/관리자 식별 응답 완료는 별도 계측합니다. 로그인 정보를 주입하거나 목표를 완화하지 않습니다.
 
 기본 모드는 읽기 전용입니다. `PERF_FULL=1`은 **과제 인증 DB의 Pod 1 상태·갱신 시각을 잠시 변경**해 수동 갱신 20회와 자동 폴링 3회의 목록/상세 반영·빈 목록 발생 여부를 확인합니다. 마지막 테스트 값과 DB가 일치할 때만 원래 상태/시각으로 복원하며 별도 restoration JSON에 결과를 기록합니다. 동시 수정이 있으면 덮어쓰지 않습니다. 실사용 DB에 실행하지 않습니다. 폴링은 요청 시작→반영 시간이며 5초 주기 탐지 대기와 구분합니다.
 
-이어 실제 15만 데이터에서 5페이지·500개를 로드하고 4초 스크롤의 CDP DrawFrame/RAF와 표시 행 수를 보관합니다. 이는 Chrome FPS 미터의 직접 관측이나 작업관리자 메모리와 같지 않습니다. 보고서는 고정 API 범주의 구간별 시간만 보관하고 URL query·헤더·본문·JWT·계정 암호는 저장하지 않습니다. 실패/초과 표본을 보존하며 매 실행은 고유한 label을 사용합니다.
+이어 실제 15만 데이터에서 5페이지·500개를 로드하고 10초 스크롤의 CDP DrawFrame/RAF와 표시 행 수를 보관합니다. 이는 Chrome FPS 미터의 직접 관측이나 작업관리자 메모리와 같지 않습니다. 목표별 요약 이미지는 저장된 실제 측정 JSON을 표현한 그래픽이며, DevTools 타임라인 캡처와 구분합니다. 보고서는 고정 API 범주의 구간별 시간만 보관하고 URL query·헤더·본문·JWT·계정 암호는 저장하지 않습니다. 실패/초과 표본을 보존하며 매 실행은 고유한 label을 사용합니다.
 
 선택형 Keycloak 관리자의 실제 로그인·SSO 재진입과 탐색은 별도 도구로 측정합니다. 기본 스크립트의 URL/10만 건 준비 조건을 토큰 주입으로 우회하지 않습니다. `PERF_LABEL=auth-admin-local python3 scripts/test-auth.py --performance`를 프로젝트 루트에서 실행하며 세부 구간과 40회 결과는 [인증 관리자 성능 보고서](AUTHENTICATION_PERFORMANCE.md)를 참고합니다. 비밀번호 로그인 제출·전체 SSO 재진입·callback 문서 렌더링을 분리하고 갱신은 DB를 변경하지 않는 읽기 전용입니다. 기존 변경값 전파·5페이지·스크롤·메모리 검증을 대신하지 않습니다.
 

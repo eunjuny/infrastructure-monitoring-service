@@ -11,6 +11,10 @@ export type ResourceAttributes = Record<string, unknown> & {
   cpuCapacityCores?: number; memoryCapacityMiB?: number; conditionReason?: string
   phase?: string; containerCount?: number; readyContainerCount?: number; containerState?: string
   failureReason?: string | null; lastTerminationReason?: string | null; image?: string; workloadKind?: string; workloadName?: string
+  cpuAllocatableCores?: number; cpuRequestedCores?: number; cpuUsageCores?: number
+  memoryAllocatableMiB?: number; memoryRequestedMiB?: number; memoryUsageMiB?: number
+  gpuDevices?: { name: string; model: string; memoryMiB: number; utilizationPercent: number; temperatureCelsius: number; allocatedPods: number; updatedAt: string }[]
+  containers?: { name: string; image: string; state: string; ready: boolean; restartCount: number; cpuRequestMillicores: number; cpuUsageMillicores: number; memoryRequestMiB: number; memoryUsageMiB: number }[]
 }
 export type Detail = { resource: Resource; attributes: ResourceAttributes; path: Reference[] }
 export type Page<T> = { items: T[]; nextCursor: string | null; hasMore: boolean }
@@ -20,6 +24,7 @@ export type AuthenticationConfiguration = { enabled: boolean; issuer: string; cl
 export type CurrentUser = { name: string; administrator: boolean; clusters: number[] }
 export type ChangeEvent = { id: number; occurredAt: string; previousStatus: ResourceStatus; nextStatus: ResourceStatus; source: string; beforeAttributes: Record<string, unknown>; afterAttributes: Record<string, unknown> }
 export type EventPage = { items: ChangeEvent[]; nextBeforeId: number | null; hasMore: boolean; retentionHours: number; maximumEvents: number }
+export type KubernetesEvent = { id: number; type: 'NORMAL' | 'WARNING'; reason: string; message: string; firstSeenAt: string; lastSeenAt: string; occurrenceCount: number }
 export type Operations = { available: boolean; source: string; fetchedAt: string; values: Record<string, number | null>; series: Record<string, { timestamp: number; value: number | null }[]>; message: string }
 export type AlertRule = { name: string; title: string; severity: 'critical' | 'warning'; state: 'inactive' | 'pending' | 'firing'; activeAt: string | null; value: number | null; condition: string; response: string }
 export type AlertSnapshot = { available: boolean; source: string; fetchedAt: string; rules: AlertRule[]; message: string }
@@ -83,6 +88,7 @@ export const api = {
   saveAlertEmail: (recipient: string, enabled: boolean, signal?: AbortSignal) =>
     get<AlertEmail>('/alert-email', signal, '/api/operations', { recipient, enabled }),
   events: (resource: Reference, beforeId?: number | null, signal?: AbortSignal) => get<EventPage>(`/${resource.type}/${resource.id}/events?limit=20${beforeId ? `&beforeId=${beforeId}` : ''}`, signal),
+  kubernetesEvents: (resource: Reference, signal?: AbortSignal) => get<KubernetesEvent[]>(`/${resource.type}/${resource.id}/kubernetes-events?limit=20`, signal),
   summary: (signal?: AbortSignal) => get<Summary>('/summary', signal),
   detail: (r: Reference, signal?: AbortSignal) => get<Detail>(`/${r.type}/${r.id}`, signal),
   children: (r: Reference | null, cursor?: string | null, signal?: AbortSignal) => {

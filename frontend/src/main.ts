@@ -4,11 +4,13 @@ import { api } from './api'
 import './style.css'
 
 async function start() {
+  let loadIdentity: (() => Promise<void>) | undefined
   if (import.meta.env.VITE_AUTH_ENABLED === 'true') {
     try {
       // Independent public config I/O can overlap the auth chunk download/parse.
-      const [{ initializeAuthentication }, config] = await Promise.all([import('./authentication'), api.authConfig()])
+      const [{ initializeAuthentication, loadAuthenticatedIdentity }, config] = await Promise.all([import('./authentication'), api.authConfig()])
       await initializeAuthentication(config)
+      loadIdentity = loadAuthenticatedIdentity
     } catch {
       // Never mount the resource screen or fall back to local mode on auth failure.
       const root = document.getElementById('app')!
@@ -22,6 +24,14 @@ async function start() {
       return
     }
   }
-  createApp(App).mount('#app')
+  createApp(App, {
+    onInitialListSettled() {
+      // Identity metadata must not compete with the first list request/paint.
+      // Every resource API is still authorized by the server from its JWT.
+      const load = loadIdentity
+      loadIdentity = undefined
+      if (load) void load().catch(() => undefined)
+    },
+  }).mount('#app')
 }
 void start()

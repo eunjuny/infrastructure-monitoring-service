@@ -53,6 +53,9 @@ class SchemaIntegrationTest {
         var seed = new ResourceDatabasePopulator(new ClassPathResource("seed.sql"));
         seed.execute(dataSource);
         assertExpectedCounts();
+        assertThat(jdbc.queryForObject("select count(*) from infrastructure_pod_container", Long.class)).isGreaterThan(150000L);
+        assertThat(jdbc.queryForObject("select count(*) from infrastructure_node_gpu", Long.class)).isEqualTo(40L);
+        assertThat(jdbc.queryForObject("select count(*) from infrastructure_kubernetes_event", Long.class)).isGreaterThan(0L);
         assertThat(jdbc.queryForObject("""
                 select count(*) from (
                   select cluster_id from infrastructure_node
@@ -86,6 +89,7 @@ class SchemaIntegrationTest {
                 """);
         seed.execute(dataSource);
         assertExpectedCounts();
+        assertThat(jdbc.queryForObject("select count(*) from infrastructure_pod_container", Long.class)).isGreaterThan(150000L);
         assertThat(jdbc.queryForMap("""
                 select count(*) as rows, sum(id) as ids, sum(restart_count) as restarts,
                        min(updated_at) as earliest, max(updated_at) as latest

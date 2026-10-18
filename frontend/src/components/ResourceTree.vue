@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, shallowRef } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import { api, keyOf, errorMessage, type Page, type Resource, type Reference } from '../api'
 import VirtualList from './VirtualList.vue'
 import UiIcon from './UiIcon.vue'
-const props = defineProps<{ selected: string }>()
+import { recordPaintTiming } from '../paintTiming'
+const props = withDefaults(defineProps<{ selected: string; initialReady?: boolean }>(), { initialReady: true })
 const emit = defineEmits<{ select: [resource: Resource]; browse: [resource: Resource] }>()
 type Branch = { page: Page<Resource>; cursor: string | null; previous: (string | null)[]; pinned?: Reference }
 type TreeRow = { kind: 'resource'; resource: Resource; depth: number } | { kind: 'page'; parent: Resource | null; depth: number; branch: Branch }
@@ -11,6 +12,7 @@ const branches = shallowRef(new Map<string, Branch>()), expanded = ref<string[]>
 const loading = ref(false), error = ref('')
 const virtual = ref<{ scrollToIndex(index: number): void } | null>(null)
 let controller: AbortController | undefined, revision = 0
+let cancelTiming: (() => void) | undefined
 const branchKey = (r: Reference | null) => r ? keyOf(r) : 'root'
 const rows = computed(() => {
   const result: TreeRow[] = []
@@ -62,15 +64,18 @@ async function refresh() {
   finally { if (token === revision) loading.value = false }
 }
 async function toggle(resource: Resource) {
+  const started = performance.now()
+  const measured = (name: string) => { cancelTiming?.(); cancelTiming = recordPaintTiming(name, started) }
   const key = keyOf(resource)
-  if (expanded.value.includes(key)) { expanded.value = expanded.value.filter(k => k !== key); return }
+  if (expanded.value.includes(key)) { expanded.value = expanded.value.filter(k => k !== key); measured('Tree collapse'); return }
   if (!resource.hasChildren || loading.value) return
-  if (branches.value.has(key)) { allowExpansion(key); return }
+  if (branches.value.has(key)) { allowExpansion(key); measured('Tree cached expand'); return }
   const { signal, token } = begin()
   try {
     const page = await api.children(resource, null, signal)
     if (token !== revision) return
     allowExpansion(key); store(key, { page, cursor: null, previous: [] })
+    measured('Tree cold expand')
   } catch (cause) { if (token === revision && !signal.aborted) error.value = errorMessage(cause) }
   finally { if (token === revision) loading.value = false }
 }
@@ -119,9 +124,11 @@ async function reveal(path: Reference[]) {
   } catch (cause) { if (token === revision && !signal.aborted) error.value = errorMessage(cause) }
   finally { if (token === revision) loading.value = false }
 }
-// Fetch root data while the surrounding console is still mounting, not afterwards.
-void refresh()
-onBeforeUnmount(() => { controller?.abort(); revision++ })
+// Let the primary Cluster list appear before requesting the secondary hierarchy.
+watch(() => props.initialReady, ready => {
+  if (ready && !branches.value.has('root')) void refresh()
+}, { immediate: true })
+onBeforeUnmount(() => { controller?.abort(); revision++; cancelTiming?.() })
 function stop() { controller?.abort(); revision++; loading.value = false }
 defineExpose({ refresh, reveal, stop, isBusy: () => loading.value, hasError: () => Boolean(error.value) })
 </script>
@@ -130,7 +137,7 @@ defineExpose({ refresh, reveal, stop, isBusy: () => loading.value, hasError: () 
     <div class="panel-title"><h2 id="tree-heading">계층 탐색</h2><span v-if="loading" role="status">조회 중</span><button :disabled="loading" @click="resetHierarchy">처음</button></div>
     <p class="muted">Cluster → Node → Namespace → Pod</p>
     <p v-if="error" role="alert" class="error">{{ error }} <button @click="refresh">다시 조회</button></p>
-    <p v-if="!loading && !error && !rows.length" class="empty">저장된 리소스가 없습니다.</p>
+    <p v-if="!loading && !error && !rows.length" class="empty">{{ props.initialReady ? '저장된 리소스가 없습니다.' : 'Cluster 목록을 불러온 뒤 표시합니다.' }}</p>
     <VirtualList ref="virtual" :items="rows" :keys="rowKeys" label="리소스 계층 목록" :row-height="44">
       <template #default="{ item }">
         <div v-if="item.kind === 'resource'" class="tree-item" :class="{ selected: props.selected === keyOf(item.resource) }" :style="{ paddingLeft: `${item.depth * 14}px` }">

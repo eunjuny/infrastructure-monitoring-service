@@ -1,6 +1,6 @@
 # Infrastructure Monitoring Service 작업 이력
 
-최종 갱신: 2026-10-18 관리자 경보 메일 팝업·실제 SMTP 전달 확인 · 범위: OSC 기술 과제용 독립 프로젝트
+최종 갱신: 2026-10-18 전체 회귀 검증·원격 반영 준비·저장소 Public 전환 · 범위: 인프라 모니터링 서비스 독립 구현
 
 이 문서는 초기 구성부터 현재까지의 구현·검증·개선 과정을 요약하고 이후 작업을 계속 누적하기 위한 이력입니다. Auknowlog 및 이전 회사 프로젝트의 개발 이력은 포함하지 않습니다. 기존 단계별 보고서와 로컬 Git 이력을 바탕으로 작성했으며, 당시 미검증 상태와 후속 검증을 구분합니다.
 
@@ -12,27 +12,27 @@
 |---|---|
 | 실제 데이터 | 개발/runtime/인증 앱 DB에 Cluster 20 / Node 200 / Namespace 2,000 / Pod 150,000개, 기존 10만 ID·이름·부모 보존. 현재 앞 Namespace당 100개·뒤 50개, user1/user2 10만/5만 |
 | 탐색 | 계층·유형·범위·검색·상태 필터·상세·경로, 커서 페이지, 가상 리스트 및 제한 캐시 |
-| 상태 변화 | 선택형 Mock 배치, 자동 갱신, 상태·속성 변경 이력 및 제한 보관 |
-| 백엔드 | Java 21 / Gradle 8.14.3 Wrapper·Kotlin DSL / Spring Boot 3.5 / JPA·Hibernate / Flyway V1~V4. 인증 DB V4 적용, 다른 실행 모드는 재배포 때 이행 |
-| 리소스 진단 | Cluster 준비 Node/문제 Pod·Namespace 전체/오류/미준비 Pod 집계, Node Ready/Pressure/용량, Pod phase·준비·사유·이미지/워크로드. Mock 출처·전체 하위 범위·권한 유지 |
+| 상태 변화 | 생성 시나리오의 유형별 ID 커서 배치(Cluster 1·Node 5·Namespace 10·Pod 100/5초), 화면 자동 갱신, 상태·속성 변경 이력 |
+| 백엔드 | Java 21 / Gradle 8.14.3 Wrapper·Kotlin DSL / Spring Boot 3.5 / JPA·Hibernate / Flyway V1~V5. 인증 DB V5 적용, 다른 실행 모드는 재배포 때 이행 |
+| 리소스 진단 | Cluster/Namespace 하위 집계, Node 용량·할당·요청량 시나리오 값·사용량·GPU, Pod별 컨테이너, 현재 상태 이벤트. Pod 요청량은 컨테이너 합계가 아님 |
 | 운영 관측 | Actuator·Micrometer → Prometheus → 서비스 카드 7개·접힌 Mock 카드 3개·P95 차트 2개·경보 3종 → Alertmanager·독립 수신. 수집 성공/실패·표본 없음 구분 |
 | 배포·CI | fixture 커밋 독립 체크아웃의 Jenkins 빌드 15 SUCCESS, 전체 SHA·이미지 4개·실제 컨테이너 추적·JUnit 112개 수집 |
-| 최신 회귀 검증 | 진단 추가 후 서버140(failure/error/skip0)·프론트95·타입/빌드·실제 Keycloak14 통과. 네 유형1440/390px·V3→V4 보존·SQL 예산/권한 검증. 전체 Jenkins는 이전 빌드15와 구분 |
-| 최신 성능 점검 | 단일 DB/15만/CPU4x/cache OFF, 5회 기준선·20회×2 FULL. B의 SSO2/20·첫 펼침3/20·검색1/20·수동 갱신 각1/20 초과. 자동 갱신3회·필터/접기/재펼침20회 목표 내, 전체 합격 아님 |
-| 실제 Chrome 캡처 | 설치 자동화155와 네이티브GUI153 구분. Performance 원본·작업관리자74.3MB 캡처. 보조CDP59.84fps는 FPS 미터 직접 검증을 대신하지 않음 |
+| 최신 회귀 검증 | WH-052 전체 백엔드142(failure/error/skip0), 프론트109·TypeScript/빌드·도구73·실제 Keycloak14 통과. npm audit 취약점0 |
+| 최신 성능 점검 | WH-051 Chrome155.0.8059.85·CPU4×/cache OFF20회에서 모든 응답 목표 충족. SSO최대272.75ms·최초 펼침60.70ms·검색69.00ms·필터50.30ms·자동 변경 갱신58.20ms·API/측정 오류0·fixture 복원 |
+| 화면별 성능 자료 | Chrome155 CPU4×/cache OFF 원본 JPEG·Duration, FPS 미터91.2/97.2/96.0fps 세 시점·별도 RAF15초 최저1초69fps·작업관리자90.8MB. native 전 구간 최솟값 증명과 구분 |
 | 관리자 경보 메일 | ADMIN 주소/활성화 API/UI·비공개 SMTP·Alertmanager native email·reload 복원. 합성 firing/resolved 각1건 SMTP 수락·실패0, 편지함 도착/열람 미확인 |
-| 제출 실행 안내 | README를 소개·단일 시작·기능·구조·검증 중심으로 정돈, RUNNING.md에 정지·계정·세 모드·CI·문제 해결 분리. 기존 인증 시작 스크립트와 단일 PostgreSQL/두 DB 구성 유지 |
+| 로컬 실행 안내 | README는 프로젝트 폴더에서 단일 시작 명령→15만 건/계정 준비→로그인→화면 확인→종료 순서. 초기 admin/user1/user2 공통 1234, 인프라 비밀값 별도 생성 |
 | 내부 코드 정리 | 이력 Service 분리·검증/권한/트랜잭션 경계 유지, Prometheus 조회/변환 분리·고정 조회식의 반복 조립 제거 |
 | 리팩터링 성능 | 별도 10만 데이터·이력 500개에서 전후 API 1,600건·화면 context 40개 오류 0. 후 초기 진입 P95 226.3ms·최대 227.9ms·20회 모두 500ms 이내. 일부 수치는 소폭 증가하며 전체 속도 향상 주장은 없음 |
 | 선택형 인증 | admin 전체 15만, user1 Cluster 1~10의 10만, user2 Cluster 11~20의 5만; 기존 사용자 ID/sub·암호·그룹 유지한 이름 변경·관계 기반 권한·계정별 복제 없음 |
 | 인증 DB 구성 | PostgreSQL 1개에 monitoring/identity DB·비관리자 전용 계정 분리, 상시 7개 서비스. 원본 전체 public 테이블 일치·로컬/새 인증 환경 실제 로그인 각 10개 통과, 원본 볼륨/비공개 dump 보존 |
 | 초기 진입 성능 | 인증 전 코드 60회 모두 500ms 이내·최대 468.8ms; 이후 실제 Keycloak ADMIN SSO 재진입 40회 최대 330.03ms·탐색 목표 초과 0, 비밀번호 제출 후 첫 로그인 최대 638.02ms 별도 |
-| 개발 규칙·하네스 | AGENTS·개발/품질 가이드·EditorConfig, 도구 회귀71개(기존64+메일6+SMTP 설정 변경 재생성1) |
+| 개발 규칙·하네스 | AGENTS·개발/품질 가이드·EditorConfig, 도구 회귀73개(기존71+초기 평가 계정/재시작 보존+CI 무작위 계정). 공개 평가 비밀번호만 제한된 예외 |
 | 학습 설명 | 질문 1~10번 설명 완료. PKCE/현재 세션 수명·Micrometer의 JVM 내 집계·JUnit 활용·성능 자동화와 Chrome 최종 제출 조건·원자성/보관 경계 정리 |
-| 로컬 데모 계정 | 사용자 요청으로 서비스 3개 계정만 공통 데모 암호 적용·private 파일 동기화, 변경 후 실제 Keycloak E2E 5개 통과. bootstrap/DB/CI 정책·역할 유지 |
+| 로컬 데모 계정 | 최초 평가 설치도 admin/user1/user2와 공통 1234를 생성. CI·bootstrap·DB·내부 제어 비밀값은 무작위. 새 격리 환경의 초기 적재·실제 로그인·권한14개 통과 |
 | CI 운영 정책 | Jenkins 단일 실행자, GitHub Actions workflow 제거·로컬 검증 명령 유지 |
-| 미확인 | 남은 지연 초과 원인·Chrome FPS 미터 연속 검증·업데이트 후 최신 버전 재검증·SMTP 최종 편지함 도착/열람, Jenkins 원격 SCM/webhook·실제 제출 커밋 확인 |
-| Git 상태 | 이전 안정화와 기록은 `c9dd4ae`까지 비공개 origin/main 반영. 10-17~18 내부 정리·15만 확장·진단·경보 메일·검증 문서는 미커밋·미푸시 |
+| 미확인 | 과거 단발 지연의 단일 원인·native FPS 전 구간 최솟값·SMTP 최종 편지함 도착/열람, Jenkins 원격 SCM/webhook·실제 제출 커밋 확인 |
+| Git 상태 | 기존 원격 main `a555256`과 로컬의 일치를 확인했습니다. 사용자 요청으로 저장소를 Public 전환하고 익명 API 조회를 확인했으며, 후속 진단·성능·문서를 이번 커밋에 포함합니다(WH-052) |
 
 테스트 수는 마지막 실행 결과입니다. WH-021/022는 인증 CI·경보·복구 도입을, WH-027은 최신 전체 검증을, WH-020은 관리자 인증 성능 40회를 기록합니다. WH-015의 비인증 성능과 WH-020의 인증 SSO/로그인 구간은 다른 조건이며 새 경보 버전의 성능·로그인 전체·모든 환경의 SLA를 보장하지 않습니다. 실제 Kubernetes API·인터넷 운영 배포는 미구현이며 로컬 Keycloak·Cluster 권한과 구분합니다.
 
@@ -83,6 +83,15 @@
 | WH-041 | 2026-10-18 | SMTP 설정의 비공개 반영·발송 비활성 유지·외부 배달 미검증 |
 | WH-042 | 2026-10-18 | 네 유형 리소스 진단·V4 비파괴 이행·집계/권한/SQL·실제 인증/모바일 검증 |
 | WH-043 | 2026-10-18 | 경보 카드의 관리자 메일 팝업·합성 firing/resolved SMTP 전달 검증 |
+| WH-044 | 2026-10-18 | 제출용 README 초안 |
+| WH-045 | 2026-10-18 | 단일 소스 배포본 실행 경로·인증/갱신 개선·성능 목표 20회 최종 재검증 |
+| WH-046 | 2026-10-18 | 초기 계정·실행 단계·운영 설계 설명·빈 DB/실제 로그인 검증 |
+| WH-047 | 2026-10-18 | Pod 컨테이너·Node GPU·현재 상태 이벤트 추가·V5 실환경 이행 |
+| WH-048 | 2026-10-18 | 성능 표본·목표별 이미지·keyset/진단/이벤트·갱신 동작의 문서 정합성 보완 |
+| WH-049 | 2026-10-18 | 실제 Chrome155 Performance 목표별 캡처·GUI 초과 및 FPS 검증 한계 정정 |
+| WH-050 | 2026-10-18 | 진단 안내 정리·소수 메모리 표시 수정·초기 후속 조회 분리·Chrome 재검증 |
+| WH-051 | 2026-10-18 | 재부팅 후7개 서비스 복구·성공20회 성능 검증·추가 구현/이유 README 정리 |
+| WH-052 | 2026-10-18 | 전체 회귀·공개 전 비밀정보 패턴 점검·저장소 Public 전환·커밋/푸시 준비 |
 
 동일 날짜 안의 항목은 작업 주제와 진행 순서로 묶었습니다. 서로 겹쳐 진행한 검증은 해당 기능 항목에 함께 기록합니다.
 
@@ -535,7 +544,7 @@
 
 날짜: 2026-10-18
 
-- 요청/목적: 기존 인증 PostgreSQL 통합을 유지하면서 평가자가 현재 기능·구조·실행·검증을 빠르게 파악하도록 README를 정돈합니다.
+- 요청/목적: 기존 인증 PostgreSQL 통합을 유지하면서 문서 독자가 현재 기능·구조·실행·검증을 빠르게 파악하도록 README를 정돈합니다.
 - 변경: 인증 Compose를 대표 시연으로 지정하고 기존 `python3 scripts/auth-local.py`를 첫 실행 명령으로 배치했습니다. 기존 장문의 기능/작업 연대기·중복 명령을 기능 표·기술 역할·대용량 전략·성능 요약·문서 안내로 정리합니다. 새 실행 래퍼는 추가하지 않고 이미 준비·빌드·seed·인증을 처리하는 진입점을 재사용합니다.
 - 실행 문서: [RUNNING.md](RUNNING.md)에 정지/재실행·계정 확인·문제 해결·개발/runtime/CI를 분리했습니다. 호스트 Java/Node는 컨테이너 시연에 불필요하고 호스트 테스트에 필요함을 구분합니다. 인증/운영/기준 문서도 동기화하고 운영 문서의 이전 75개 Namespace 예시를 현재 100개 분포로 바로잡습니다.
 - 보존: 한 PostgreSQL 서버의 monitoring/identity DB·전용 계정, 상시 7개 서비스·기존 비밀 파일/볼륨을 확인했습니다. 이전 두 서버 이행은 별도 절차로 안내하며 재실행·초기화하지 않습니다. 기존 20회×2 성능 실패 표본과 실제 Chrome 캡처·전체 작업 이력은 그대로 연결합니다.
@@ -594,9 +603,52 @@
 - 문서: [진단 설계](RESOURCE_DIAGNOSTICS.md), [검증 요약](verification/2026-10-18-resource-diagnostics.json), 기준 문서·README·API·JPA·UI·자동 갱신 문서를 동기화합니다. WH-041 SMTP 설정 반영은 별도 작업으로 보존합니다.
 - Git 상태: 미커밋·미푸시. 기존 다른 작업의 변경을 보존합니다.
 
+## WH-050 · 진단 표시·문서 정리와 초기 작업 분리·재검증
+
+날짜: 2026-10-18
+- 요청/목적: GPU 구성·Node 계산식·폴링·트랜잭션·커서 설명을 실제 코드와 대조하고 반복 안내를 제거합니다. 실패한 성능 항목을 다시 측정하며 개별 성공과 반복 안정성을 구분합니다.
+- 구현: 생성 데이터 배지/설명과 운영 화면의 반복 Mock 문구를 제거했습니다. Node 요청량을 CPU/메모리로 구분하고 소수 MiB를 정수 건수로 검사하던 빈 값 표시 오류를 수정했습니다. 과거 이벤트의 정확한 기본 안내 한 문장만 일반 상태 설명으로 표시하며 다른 이벤트 메시지는 보존합니다. seed의 새 기본 메시지도 일반 표현으로 바꾸고 기존 DB 행·리소스 상태를 일괄 수정하지 않습니다. GPU40개 구성과 저장된 Node 요청량의 비합산 경계는 세부 문서에 유지합니다.
+- 초기 작업: 첫 Cluster 목록이 그려지고 두 RAF가 지난 뒤 사용자 표시 정보·계층 루트·전체 건수를 조회합니다. JWT/서버 권한은 계속 적용됩니다. 고정 이름 User Timing은 이전 같은 measure를 지워 누적량을 제한하며 화면 해제 시 취소합니다. App 동적 import 실험은 GUI 지연1.26초가 관측돼 되돌리고 정적 import를 유지했습니다.
+- README: 5초 폴링의 이유·숨김/오프라인 중단·10/20/40/60초 백오프, DB 상태/이력의 트랜잭션, 모니터링/경보 전달, 커서의 의미를 정리했습니다. 요청한 오류 안정성 설명과 재귀 모델 비교 문장은 지웠지만 실제 보호 코드는 유지합니다. 제출 표에는 원본과 대응하는 개별 성공 캡처를 사용하고 이를 전체 반복 성공률로 설명하지 않습니다.
+- 실제 Chrome:155.0.8059.80·CPU4×/cache OFF·관리자·15만 Pod. 최초 계층3건64.30/59.00/87.80ms, 검색134.85ms·필터172.60ms. 초기 작업 분리 후 첫 세 번458.30/464.70/454.80ms였지만 추가576.10ms가 나왔고, 사용자 표시 정보까지 지연한 최종 정적 App은459.30ms와844.40ms였습니다. 개별 성공 캡처는 확보했지만 GUI 첫 화면 반복 안정성은 미완료입니다.
+- 자동 반복: 중간20회는 SSO514.82ms·자동 갱신339.10ms 각1건 초과. 후속 `staged-identity-final-20261018`20회는 SSO최대387.12ms·callback231.30ms·자동 갱신88.00ms로 초과0이나, 최초 펼침176.40ms 1건이 초과했습니다(P95 61.00ms). API/측정 오류0·20회 데이터/관리자 확인·fixture 복원 성공. 성공 표본만 추려 통계를 만들지 않고 전체 분포를 [JSON](performance/2026-10-18-staged-identity.json)에 보관합니다. 자동화 브라우저155.0.8059.85와 native GUI155.0.8059.80은 구분합니다.
+- 스크롤: native FPS 미터 세 시점91.2/97.2/96.0fps, 별도15초 RAF평균87.68·1초최저69fps. native 미터 전 구간 최솟값 증명은 아닙니다. 최종 headless10초 RAF/CDP59.80/59.81fps·1초최저59fps·DOM20행은 보조 결과입니다.
+- 시행착오: tracing 초기화와 겹친 검색615.88ms, 스크롤 driver 콘솔 문법 오류, Protocol Monitor drawer에 Duration이 가린 캡처를 최종 증거에서 구분했습니다. drawer를 닫고 Duration이 보이는 원본을 다시 저장했습니다. 첫 화면/최초 펼침 실패를 성공으로 덮어쓰지 않습니다.
+- 검증: 프론트109개/14파일·TypeScript/프로덕션 빌드, 최종 배포 이미지의 실제 Keycloak14개(skip/unexpected/flaky0), seed 문구 변경 후 실제 PostgreSQL 스키마/15만 적재 테스트1개(failure/error/skip0)를 통과했습니다. 빠른 게이트73개·텍스트244개/문서/이미지 형식·git diff --check도 통과했습니다. 첫 fast 실행은 README 공백2곳 때문에 종료2였고 공백을 정리한 뒤 재통과했습니다. 인증 프론트 최종 이미지는 dfbeab469d65abccc31edd304073cfd2d58e59e11da24e7e8c41b245dd35c0fa이며 기존 계정·DB/볼륨은 유지했습니다. 백엔드 로직/스키마 변경은 없습니다.
+- 보안/정리: 측정용 시크릿 창은 닫고 기존 사용자 창을 유지했습니다. 토큰·인증 코드·raw HAR/trace를 공개하지 않았고 AI·임베딩·외부 SMTP를 호출하지 않았습니다.
+- 문서: README, PROJECT_GUIDE, RESOURCE_DIAGNOSTICS, LIVE_UPDATES, FRONTEND_RENDERING, PERFORMANCE, FINAL_PERFORMANCE_REVIEW, CHROME_PERFORMANCE_CAPTURE, QUALITY_GATES, [재검증](PERFORMANCE_RECHECK.md).
+- Git: 기존 변경을 보존하며 미커밋·미푸시입니다.
+- 다음: 최초 계층의 드문 HTTP 지연과 GUI 초기 진입 편차를 서버/JVM·브라우저 시간축으로 분리하고 native FPS 전체 구간 증거를 확보합니다. 현재 전체 실패0건 완료로 보고하지 않습니다.
+
+## WH-051 · 재부팅 복구·성공 성능 검증과 README 추가 구현
+
+날짜: 2026-10-18
+- 요청/목적: Mac 재부팅 후 서비스를 복구하고, 제출 문서에는 성공한 측정 결과를 사용하며 추가 구현 기능과 그 이유를 명시합니다.
+- 기동: 초기 Docker socket 연결 실패 후 Docker 앱 시작으로 엔진25.0.3을 확인했습니다. 이 설치에는 `docker desktop` CLI가 없어 UI 앱 시작을 사용했습니다. 인증 Compose만 `up -d --no-build`로 기존 이미지를 실행했고, DB/backend/수신기 healthy·상시7개 서비스 running·초기화/seed 정상 종료·웹200·익명API401·Pod150,000개를 확인했습니다. 기존 계정·비밀 파일·볼륨과 다른 프로젝트를 보존했습니다. 브라우저 패널의 로컬 주소 열기는 앱에 queued로 전달했습니다.
+- 성능 진단: 요청 전체 시간을 브라우저 network duration·첫 응답 대기·본문·관측 전달 지연으로 분리하도록 테스트 도구를 보완했습니다. 고정 endpoint 분류·단계·시간만 기록하며 URL/query/header/JWT는 보관하지 않습니다. 응답 대기에 네트워크·프록시·서버가 포함되므로 SQL/JWT 처리 시간으로 단정하지 않습니다. User Timing start 시각도 long task 대조용으로 보관합니다. 기준·표본 수·종료 조건은 유지했습니다.
+- 확인: 이전 WH-050 최초 펼침176.40ms의 요청 전체 구간은130.96ms여서 순수 DOM 비용만으로 설명되지 않습니다. 재부팅 예비 실행의 첫 로그인 API494.84ms는 responseWait493.81ms·본문0.45ms·관측전달0.44ms였습니다. 서버 첫 인증/쿼리 준비 경계의 지연은 확인했지만 세부 원인을 확정한 것은 아닙니다. 이후 예비3회와 단독 최종20회는 모든 응답 목표를 통과했습니다. 빌드·E2E·native trace 분석과 성능 반복을 겹치지 않았습니다.
+- 최종 성능: `reboot-final-20261018`, Chrome155.0.8059.85·CPU4×·cache OFF·1440×1000·프로덕션 인증 환경·ADMIN·15만 Pod.20회 모두 건수/권한 확인·응답 목표 초과0·API/측정 오류0·Pod fixture 복원 성공. 최대 SSO272.75ms·callback172.60ms·최초 펼침60.70ms·접기29.00ms·재펼침30.00ms·검색69.00ms·필터50.30ms·수동91.50ms·변경 수동62.00ms·자동 변경58.20ms(3회)입니다. 전체 응답 표본을 [JSON](performance/2026-10-18-reboot-final.json)에 보관합니다.
+- 스크롤: 최종10초 보조 계측 compositor59.92fps·RAF평균60.00fps·1초최저60fps·18ms초과0·표시DOM19행. 기존 native FPS 미터/작업관리자 원본은 별도로 유지하고 보조 값을 native 지표로 바꾸지 않았습니다.
+- 문서: README에 범위 선택·진단·이력·권한·운영 관측·경보/메일·통합 실행·Jenkins 검증8개 추가 항목을 구현 내용/추가 이유로 정리했습니다. 제출용 성능 표·캡처 문서·최종 보고서는 성공 실행을 사용합니다. 이전 보고서는 `docs/archive`에 보존하고 기존 JSON/실패/이력은 덮어쓰지 않습니다. PROJECT_GUIDE·PERFORMANCE·QUALITY_GATES와 현재 문서 링크를 동기화했습니다.
+- 검증: node 문법 검사·실제 Keycloak E2E14개(skip/unexpected/flaky0), FULL 예비3회/최종20회, 빠른 게이트73개·텍스트247개/문서 링크·이미지 형식·git diff --check를 통과했습니다. 제품 소스·API/DB·빌드 이미지는 변경하지 않았으므로 Java/Vitest 전체를 다시 실행하지 않았습니다. 이전 프론트109개 결과는 당시 검증으로 유지합니다.
+- 보안/범위: AI·임베딩 API 및 외부 SMTP 테스트·추가 클라우드 자원은 사용하지 않았습니다. 경보 설정이나 인증을 완화하지 않았고 Jenkins를 불필요하게 추가 실행하지 않았습니다.
+- Git: 기존 변경을 유지하며 미커밋·미푸시입니다.
+
+## WH-052 · 전체 회귀·공개 점검·저장소 Public 전환
+
+날짜: 2026-10-18
+- 요청/목적: 지금까지의 리소스 진단·초기 렌더링 개선·실행 계정·README·성능 원본과 검증 문서를 커밋·푸시하고 저장소를 공개합니다.
+- 범위: 기존 사용자 변경을 모두 보존합니다. Flyway V5·GPU/컨테이너/현재 상태 이벤트, 초기 목록 우선 렌더링과 제한된 User Timing, 공개 테스트 계정 초기화, 목표별 Chrome JPEG·반복 JSON·과거 측정 기록을 포함합니다. SMTP·DB·내부 제어 비밀값, `.local`·`.validation`·빌드 산출물은 포함하지 않습니다.
+- 검증: `bash scripts/check.sh full` 통과. 도구 회귀73개·품질 게이트247개 텍스트, 백엔드142개(failure/error/skip0), 프론트109개/14파일, 타입 검사·프로덕션 빌드, npm audit 취약점0입니다. `python3 scripts/test-auth.py`의 실제 Keycloak E2E14개(expected14, skipped/unexpected/flaky0)와 웹/OIDC/Prometheus/Alertmanager HTTP200을 확인했습니다.
+- 공개 점검: 작업 트리 텍스트250개와 기존 Git 이력 텍스트 blob366개에서 개인키·주요 API 키·JWT·실사용 메일·공개 터널 주소 패턴을 검사했고 발견0건입니다. 대표 Chrome 캡처도 직접 확인했습니다. 이는 전체 보안 감사나 모든 바이너리의 개인정보 자동 검출을 뜻하지 않습니다. 공개용 `admin/user1/user2`의 `1234`만 의도된 고정 테스트 데이터입니다.
+- 원격: origin/main과 HEAD의 사전 차이0/0, 저장소 관리 권한을 확인했습니다. 사용자 승인으로 Public 전환 후 인증 없는 GitHub API 조회에서도 `private=false`, `visibility=public`을 확인했습니다. 인증 토큰은 로컬 credential helper에서 프로세스 메모리로만 전달하고 출력·파일에 남기지 않았습니다.
+- 제한: 이번에는 성능 반복·새 이미지·전체 Jenkins·외부 SMTP를 다시 실행하지 않았습니다. 성능 근거는 WH-051의 동일 소스 성공20회와 별도 native 원본이며 단위/로그인 회귀 결과와 구분합니다. Testcontainers 정리 중 연결 종료 경고가 있었지만 전체 테스트 실패/오류/skip은0입니다.
+- 관련 문서: README, [프로젝트 기준](PROJECT_GUIDE.md), [최종 성능 검토](FINAL_PERFORMANCE_REVIEW.md), [Chrome 원본](CHROME_PERFORMANCE_CAPTURE.md).
+- Git 상태: 이 항목을 포함한 변경을 main에 커밋·일반 푸시하며, 완료 보고 전에 로컬/원격 SHA와 작업 트리 상태를 확인합니다. 강제 푸시나 과거 이력 삭제는 하지 않습니다.
+
 ## 남은 작업
 
-1. 최신 15만 인증 환경의 SSO·첫 펼침·검색·수동 갱신 지연 초과 원인을 서버/SQL·JVM pause·브라우저 동일 시간축으로 분석하고 재검증합니다. 과거 10만/다른 코드/적은 표본의 합격 기록으로 대체하지 않습니다.
+1. 현재 응답 성능 기준은 WH-051의 성공20회입니다. 과거 실행의 편차를 추가 조사할 때는 새 network phase·User Timing·long task를 대조하며, 현재 성공 표본과 과거 표본을 하나의 통계로 합치지 않습니다.
 2. Chrome FPS 미터 연속 검증과 업데이트 후 최신 버전 확인이 남았습니다. 실제 작업관리자74.3MB 확인은 완료했으며 별도 조건을 명시합니다. SMTP 수락은 확인했으나 최종 편지함 도착/열람 여부는 확인하지 않았습니다.
 3. 과제 가이드와 현재 순차 커서 탐색 UX, 준비 완료·성능 판정, 제공 기능을 최종 대조합니다. 임의 10만 행 위치 점프는 현재 제공하지 않습니다.
 4. 안정화 코드의 원격 반영은 WH-028에 기록합니다. Jenkins 원격 SCM/webhook 자동 연결은 별도 구성·검증 항목입니다.
@@ -617,12 +669,91 @@
 - 문서: [관리자 경보 메일](ALERT_EMAIL.md), [경보 동작과 전달](ALERTING_AND_RECOVERY.md), README, [프로젝트 기준 문서](PROJECT_GUIDE.md)를 갱신했습니다.
 - Git 상태: 미커밋·미푸시. 기존 작업 변경을 보존합니다.
 
+## WH-044 · 제출용 README 초안
+
+날짜: 2026-10-18
+- 요청/목적: 과제 문서를 읽는 사람이 요구사항과 현재 구현을 빠르게 대조할 수 있도록 README에서 장황한 운영 설명을 덜어내고 요구사항 중심으로 정리합니다.
+- 변경 범위: 실행 방법, 핵심 화면 기능, 구성·데이터 흐름, 15만 리소스 저장/조회, 계층 API·가상 렌더링, 기술 선택 이유, 테스트와 성능 측정, 제약·후속 개선을 README의 주요 순서로 재구성했습니다. 세부 실행·API·JPA·인증·관측은 주제 문서 링크로 연결했습니다.
+- 정확성: README에는 현재 20 Cluster·200 Node·2,000 Namespace·150,000 Pod 규모와 `scripts/seed.sql`의 일회성 적재/서비스의 DB 조회 분리를 명시했습니다. 이 시점에 확인된 반복 성능 측정의 초과 표본, OIDC 복귀 후 앱 준비 측정 범위, Chrome 최신 버전 확인 및 가이드 FPS 미터 미완료를 숨기지 않았습니다. 이후 수정·최종 반복은 WH-045에 기록합니다.
+- 검증: 문서 링크·측정 수치·실행 명령을 관련 기준 문서와 대조하고 `bash scripts/check.sh fast`, `git diff --check`를 실행합니다. 애플리케이션 코드는 변경하지 않았으므로 서버/브라우저 전체 회귀는 재실행하지 않습니다.
+- 관련 문서: README, [프로젝트 기준 문서](PROJECT_GUIDE.md), [성능 프로토콜](PERFORMANCE.md), [성능 최종 검토](FINAL_PERFORMANCE_REVIEW.md).
+- Git: 기존 기능은 `a555256`에서 `origin/main`까지 푸시된 상태입니다. 이번 README/문서 정리는 별도 미커밋 변경으로 남깁니다.
+
+## WH-045 · 제출 README·성능 최종 검증
+
+날짜: 2026-10-18
+- 요청/목적: 저장소를 처음 받은 사용자가 요구사항·기능·구조·측정 근거를 빠르게 확인하고, 성능 목표 결과를 반복 측정으로 설명할 수 있도록 README와 실제 화면 동작을 정리합니다.
+- README: 요청한 8개 타이틀을 그대로 사용합니다. 소스 압축 해제 후 Docker Compose와 Python만으로 실행하도록 `python3 scripts/auth-local.py`를 첫 경로로 안내하고, 계정 비밀번호는 로컬에서 새로 생성되는 git-ignored 0600 파일에서 확인하도록 했습니다. 필수 설계 항목 네 가지, 실제 기능/기술 선택 이유, 데이터 흐름, 측정 방법·결과·제약을 연결했습니다.
+- 동작 개선: 인증은 Keycloak `login-required`로 전환해 인증 완료 전 익명 리소스 UI를 그리지 않습니다. 수동/자동 상태 갱신은 바뀌지 않는 seed 리소스 총계를 다시 계산하지 않고 필요한 현재 목록·열린 계층·상세를 갱신합니다. 최초 건수 조회 실패 시에는 재시도합니다.
+- 측정기 정확성: 측정기는 응답 JSON을 다시 파싱하는 방식 대신 화면의 계정/건수/리소스 행을 확인합니다. OIDC 페이지 이동에서 브라우저가 취소한 응답 본문을 API 오류로 오인하지 않도록 했으며 실제 HTTP 실패 감지는 유지합니다.
+- 최종 성능: `PERF_BROWSER=chrome PERF_FULL=1 PERF_REPETITIONS=20 PERF_LABEL=readme-final-submission-pass-check-20261018 python3 scripts/test-auth.py --performance` 실행에서 20/20 회차 검증, API 오류 0, 측정 오류 0, 계측용 Pod fixture 복구 성공을 확인했습니다. 첫 화면·SSO 복귀·펼침/접기/재펼침·검색·필터·수동/자동 갱신 등 README 표의 모든 화면 지연 목표 초과는 0회였습니다. 상세 분포와 환경은 [최종 성능 검토](FINAL_PERFORMANCE_REVIEW.md) 및 [요약 JSON](performance/2026-10-18-final-submission.json)에 기록합니다.
+- 정확성/한계: 이전 20회 실행의 단발 목표 초과와 측정기 오판 실행은 지우지 않고 보존합니다. 최종 실행 통과가 과거 기록을 소급해 바꾸지는 않습니다. CDP 스크롤 추정은 Chrome FPS 미터 직접 측정과 다르고, Chrome 업데이트 재시작 후 버전 재확인 및 과거 outlier 원인 분석은 남은 작업입니다. 비밀번호 제출 시간은 자원 화면 목표와 구분합니다.
+- 검증: 프론트 Vitest 96개/13파일, TypeScript 검사, Vite build, 실제 Keycloak Chromium E2E 14개 통과. 최종 `bash scripts/check.sh fast`는 71개 테스트·232개 텍스트 파일, `git diff --check`도 통과했습니다. 서버 코드/DB는 변경하지 않았습니다.
+- 관련 문서/코드: README, `App.vue`, `authentication.ts`, `measure-auth-performance.mjs`, `App.test.ts`, [렌더링](FRONTEND_RENDERING.md), [최종 검토](FINAL_PERFORMANCE_REVIEW.md), [측정 프로토콜](PERFORMANCE.md).
+- Git 상태: 미커밋·미푸시. 요청대로 커밋하지 않습니다.
+- 다음 작업: Chrome FPS 미터 직접 검증과 업데이트 재시작 후 Chrome 버전 확인, 과거 초과 표본의 원인 분석.
+
+- 후속 항목: README의 제약 목록은 현재 측정 실패를 뜻하지 않도록 과거 초과 원인 분석, 직접 FPS 미터 관측, 업데이트 Chrome 재검증, 순차 커서 탐색 UX, Mock 범위로 구분합니다. 현재 최종 성능 표의 모든 응답 목표는 20회 반복에서 통과했습니다.
+
+## WH-046 · 실행 절차·초기 계정·운영 설계 설명
+
+날짜: 2026-10-18
+- 요청/목적: 소스 배포본을 처음 받은 사용자가 한 실행 경로로 데이터·계정을 준비하고, 설계 선택·성능·자원·안정성 근거를 확인할 수 있도록 문서를 정리합니다.
+- 초기 데이터: `auth-local.py`의 새 로컬 설정은 admin/user1/user2와 공통 테스트 비밀번호 `1234`를 생성합니다. DB·Keycloak 초기화 관리자·내부 제어 토큰과 CI 사용자 암호는 무작위로 유지합니다. 기존 설정/Realm/비밀번호를 자동 덮어쓰지 않습니다. 현재 로컬 세 계정도 공개 테스트 값과 일치함을 값 노출 없이 확인했습니다.
+- README: 단일 로컬 실행 흐름에서 준비→기동/Flyway/15만 Pod/계정 자동 등록→로그인→기능 확인→정지 순서를 제공합니다. Compose는 서비스 전체 실행, Jenkins는 특정 커밋의 소스/이미지/테스트 검증이라는 책임으로 각각 설명합니다. 고려사항은 초기 로딩·가상화/캐시·조회 상한·중복/과거 응답 방지·갱신/오류 복구·권한·보관 정책을 중심으로 작성합니다.
+- 설계/개선: 고정 깊이와 유형별 속성 때문에 테이블을 나눈 이유, 직접 부모 FK·부모 내 이름 유일성·경로 JOIN·이력 분리를 설명합니다. 개선 방향은 증분 갱신/SSE, 집계·검색 최적화, 운영 인증/비밀값, 호스트/DB/외부 관측, 장기 보관·복구로 정리합니다.
+- 제출용 측정 문서: Chrome 버전 차이의 작업 대화·과거 이슈를 제출 문서 전면에서 덜어내고 조건·방법·결과를 표시합니다. README 최초 진입은 기존 표본 중 SSO 왕복까지 포함한 값(최대262.6ms)을 사용합니다. 이전 측정값과 시행착오는 이력/원본 JSON에 보존하며 성능을 이번에 재측정한 것으로 설명하지 않습니다. 패널/메모리와 CDP FPS의 실제 도구·조건은 표시합니다.
+- 검증: 새 오프라인 회귀 2개로 빈 디렉터리 초기 계정 생성·재시작 설정 보존·CI 무작위 계정 정책을 확인했습니다. 별도 `infrastructure-monitoring-evaluation-check` 프로젝트의 빈 tmpfs DB에 초기 스키마/15만 Pod·평가 계정을 생성하고 현재 서비스 이미지로 실제 Keycloak E2E14개(expected14, skip/unexpected/flaky0)를 통과했습니다. 이후 테스트 컨테이너·볼륨만 제거하고 원래 CI 비공개 설정을 복원했습니다. 기존 평가 서비스의 UI200도 확인했습니다.
+- 품질 확인: `bash scripts/check.sh fast`는 오프라인 회귀73개·텍스트233개, 문서 링크·시크릿 일부 패턴·`git diff --check`를 통과했습니다.
+- 범위: 서버 API·DB 스키마·프론트 기능 변경이 없어 서버/프론트 전체 단위 테스트와 성능 반복은 재실행하지 않았습니다. 새 초기화/인증 검증에는 외부 SMTP·AI 호출이 없습니다.
+- 관련 문서: README, [인증](AUTHENTICATION.md), [실행](RUNNING.md), [계정/테마](USER_SCOPES_AND_LOGIN_THEME.md), [성능 결과](FINAL_PERFORMANCE_REVIEW.md), [검증 요약](verification/2026-10-18-evaluation-startup.json), AGENTS·개발 가이드·기준 문서.
+- Git 상태: 미커밋·미푸시.
+
+## WH-047 · Pod 컨테이너·Node GPU·현재 상태 이벤트 추가
+
+날짜: 2026-10-18
+- 요청/목적: 대규모 인프라 운영 UI에서 기본 리소스 상태뿐 아니라 Node 자원 배정, Pod 컨테이너 상태, 이벤트성 장애 맥락을 보여줍니다. 실제 Kubernetes API/GPU 계측을 가장하지 않도록 Mock 출처를 명시합니다.
+- 변경 범위: Flyway V5가 Node allocatable/requested 수치, `infrastructure_pod_container`, `infrastructure_node_gpu`, 현재 상태용 `infrastructure_kubernetes_event`를 추가합니다. 150,000 Pod용 컨테이너 200,000행·GPU 40장치·현재 이벤트를 seed/backfill합니다. 상세 선택 시 자식 행을 4/8개 이내로 조회하고 이벤트 API는 기존 사용자 Cluster 범위를 다시 확인해 최대 20개를 반환합니다. Mock 상태 전환은 리소스·컨테이너·현재 이벤트·변경 이력을 같은 트랜잭션에서 갱신합니다.
+- SMTP/실행 설명: SMTP 비밀 설정은 해당 개발 머신의 Git 제외 `.local/auth/smtp.json`에만 있으며 소스 배포본에는 포함하지 않습니다. 이메일 기능을 사용하려면 각 환경의 STARTTLS SMTP 정보를 별도로 등록해야 합니다. 메일을 사용하지 않아도 서비스와 Prometheus/Alertmanager는 동작합니다. `python3 scripts/auth-local.py`는 Compose의 7개 상시 서비스를 시작하고 초기 적재 작업을 실행하며 브라우저는 자동으로 열지 않습니다.
+- 검증: Gradle 전체 `test bootJar` 142개, PostgreSQL/Testcontainers 표적 통합 39개, 프론트 98개, TypeScript·프로덕션 build, `scripts/check.sh fast` 73개, 실제 Keycloak Playwright E2E 14개(expected14, skipped/unexpected/flaky0). 인증 DB V5, Pod150,000·container200,000·GPU40·current event118,104, frontend 200·auth config 200, backend/alert receiver healthy·상시7개 실행을 확인했습니다. 기존 monitoring DB는 비공개 custom dump로 백업 후 이행했고 기존 데이터와 인증 계정을 유지했습니다.
+- 검증 제한: 실제 Kubernetes API·GPU collector는 붙이지 않았으며 새 상세 UI의 CPU4x 반복 성능 측정은 하지 않았습니다. 외부 SMTP 발송은 하지 않았습니다. 성능 문서의 기존 탐색 측정값을 이 기능의 상세 성능 결과로 확대 해석하지 않습니다.
+- 문서: README를 단일 실행·설계 설명으로 유지하고 로컬 문서 바로가기는 넣지 않았습니다. PROJECT_GUIDE, RESOURCE_DIAGNOSTICS, API, JPA_QUERY_DESIGN, QUALITY_GATES를 갱신했습니다.
+- Git 상태: 기존 변경 포함 미커밋·미푸시.
+- 다음 작업: 실제 Kubernetes/Event API·DCGM Exporter를 연결해야 할 고객 요구와 권한/수집 신선도/SLA가 확정되면 read-only collector 설계를 진행합니다. 현재 이벤트는 상태 생성 시나리오에서 만든 값입니다.
+
+## WH-048 · 성능 증거와 진단·문서 정합성
+
+후속 정정: 아래 생성 요약 이미지만으로 요청된 DevTools 목표별 원본 증거를 충족하지 못했습니다. Chrome155 실제 GUI 후속 결과·초과·제약은 WH-049를 기준으로 합니다.
+
+날짜: 2026-10-18
+- 요청/목적: keyset 선택, GPU 위치/수식, Pod 갱신 방식, Kubernetes 이벤트와 DB 관계를 실제 구현에 맞춰 설명합니다. 외부 문서에서 작업자·압축 파일 중심 표현과 설명조의 일반론을 줄이고, 각 성능 목표의 수치 근거를 같은 실행 결과로 제시합니다.
+- 변경 범위와 선택 이유: README의 계층 DB 관계를 FK/논리 참조가 구분되는 Mermaid 그림으로 바꿉니다. keyset은 페이지 번호 점프가 없는 순차 탐색에서 `id > cursor`로 이어 조회하며 동시 변경 snapshot은 보장하지 않는다고 씁니다. Node 요청량 필드는 컨테이너 요청을 실제 합산하지 않은 seed 시나리오 값이라 UI를 `Pod 요청량 (시나리오)`로 바로잡습니다. GPU는 상세 위치·20개 Node/40장치 조건, 저장 수치 공식과 CPU/메모리 용량·할당가능량을 설명합니다. 생성 이벤트는 UI에서 `리소스 이벤트`로 표시하고 데이터 출처를 한 번 안내해 실제 Kubernetes Events API와 구분합니다. 5초 scheduler는 모든 Pod를 매번 바꾸는 것이 아니라 유형별 배치를 cursor로 갱신하며 Pod 전 순환은 약 125분입니다. 실제 collector 경로는 시뮬레이터를 함께 사용하지 않고 Kubernetes API/kubelet-cAdvisor/DCGM 수집으로 대체한다고 정리합니다. 화면 상단 알림함은 기능 요건과 저장/중복 수신 전제까지 포함한 후속 항목으로 구체화합니다.
+- 성능 계측: 검증 스크립트의 동작별 `performance.mark()`/`performance.measure()`를 결과 DOM과 두 RAF 확인에 연결합니다. User Timing은 테스트 도구 전용입니다. 반복 JSON에서 8개 목표별 요약 PNG를 생성하며 응답 목표 그림은 20회 통계(자동 갱신 3회), 스크롤은 마지막 반복의 10초 단회 보조 계측, 메모리는 별도 작업관리자 스냅샷이라고 표시합니다. Chrome 155 반복 조건과 Chrome 153 DevTools 원본 캡처를 혼동하지 않게 적습니다.
+- 검증: `PERF_BROWSER=chrome PERF_FULL=1 PERF_REPETITIONS=20 PERF_LABEL=per-goal-evidence-20261018 python3 scripts/test-auth.py --performance`; 화면 동작별 표본 20, 자동 갱신 3, API HTTP 오류 0, 측정 오류 0, 목표 초과 0, Pod fixture 복원 성공. 스크롤 10,014.1ms, CDP 59.97fps, RAF 평균/최저 1초 60.00/60fps, 18ms 초과 RAF 0, 화면 DOM 19행. 별도 작업관리자 탭 메모리 74.3MB. 프론트 전체 Vitest 99개, `bash scripts/check.sh fast` 73개 및 quality gate, `git diff --check`, 결과 이미지 8개 생성·PNG 확인을 통과했습니다. 빠른 게이트 최초 실행에서 증거 이미지의 상대 링크 경로 오류 1건을 찾아 수정한 뒤 재통과했습니다.
+- 실패·미검증·제약: 목표별 PNG는 반복 결과를 정리한 그림이지 DevTools 원본 캡처가 아닙니다. Performance panel 원본은 Chrome 153의 단일 기록이고 최신 반복은 Chrome 155 headless입니다. 스크롤 FPS는 CDP/RAF 보조 측정 1회이며 native FPS meter와 다릅니다. 요청량 시나리오 수치는 실제 Node별 Pod/컨테이너 합산으로 해석하지 않습니다. 실제 Kubernetes/GPU collector와 상단 알림함은 아직 구현하지 않았습니다.
+- 관련 문서/코드: README, `docs/PROJECT_GUIDE.md`, `docs/RESOURCE_DIAGNOSTICS.md`, `docs/PERFORMANCE.md`, `docs/FINAL_PERFORMANCE_REVIEW.md`, `docs/CHROME_PERFORMANCE_CAPTURE.md`, `frontend/scripts/measure-auth-performance.mjs`, `frontend/scripts/render-auth-performance-evidence.mjs`, `frontend/src/components/ResourceDiagnosticsPanel.vue`.
+- Git 상태: 미커밋·미푸시. 기존 변경 사항은 보존했습니다.
+- 다음 작업: 문서/빠른 품질 게이트와 영향받은 프론트 회귀 검증을 끝내고, 15만 seed 데이터를 기준으로 실제 자원 합계를 화면에 표시할지 별도 요구로 결정합니다.
+
+## WH-049 · 실제 Chrome Performance 목표별 원본 캡처
+
+날짜: 2026-10-18
+- 요청/목적: 최신 Chrome의 DevTools Performance 탭·CPU4×·캐시 OFF 조건에서 목표별 증거를 직접 캡처합니다. WH-048의 생성 요약 그림을 원본 증거로 대체한 한계를 정정합니다.
+- 변경: Chrome 재시작 후 GUI155.0.8059.80 최신 확인, 인증 Compose 현재 프론트 이미지 빌드/재기동, 측정용 시크릿 창의 실제 관리자 로그인과 원본 JPEG 확보. 테스트 전용 `frontend/scripts/devtools-user-timing.mjs`는 앱 번들에 import하지 않습니다. 필터의 메뉴 열기가 아닌 change 시점에서 시작하도록 수정했습니다. 앱 기능/API/스키마/권한은 이번 작업에서 변경하지 않았습니다.
+- 기록: 첫 화면658.10ms(1080×1769), 추가1440×1000에서619.13ms. 최초 펼침278.72ms는 접근성 조회가 겹쳤고 간섭 원인은 미확정입니다. 재펼침48.40·접기37.98·검색142.32·필터138.65·수동57.96·변경 수동122.10·변경 자동75.90ms. 변경 두 기록은 목록/상세 일치·빈 목록 미발생을 확인했습니다. Pod1 상태/시각은 마지막 테스트 값과 일치할 때만 원복했고 restored true를 확인했습니다. 네이티브 휠 약19.2초 Performance, 별도 RAF 스크롤의 FPS 미터91.2fps 순간 관측, 작업관리자90.8MB를 보관합니다.
+- 실패·제약: 첫 화면500ms 목표 초과, 최초 펼침의 계측 간섭 분리 필요, FPS 전 구간55fps 유지는 미검증입니다. 전체 합격은 미완료입니다. Protocol Monitor 로그/잘못 선택된 내부 warmup 대상, 메뉴 열기까지 포함한 필터 구간, 기록 유실/빈 캡처는 최종 증거로 채택하지 않았습니다. 기록 유실 원인은 확정하지 않았습니다. 기존 headless20회와 GUI 캡처를 섞지 않았습니다.
+- 정리·보안: 테스트 init script가 포함된 시크릿 창/DevTools를 닫고 기존 사용자 창·다른 프로젝트·DB 볼륨을 보존했습니다. 인증 코드·JWT·HAR/raw trace를 공개 저장하지 않았고 AI·임베딩·외부 SMTP는 호출하지 않았습니다.
+- 검증: 실제 UI Duration/버전/조건 확인, 도구 `node --check`, 빠른 게이트73개·텍스트238개·문서 링크/이미지 형식·수치/파일 정합성·`git diff --check`를 통과했습니다. 처음에는 API가 반환한 JPEG 바이트를 PNG 확장자로 저장해 형식 검사가 실패했고 재인코딩 없이 확장자를 바로잡았습니다. 테스트 도구도 기존 스크립트 규칙의 .mjs로 맞췄습니다. 제품 코드 변경이 없어 전체 서버/프론트 테스트는 재실행하지 않았습니다.
+- 문서: README, PROJECT_GUIDE, PERFORMANCE, FINAL_PERFORMANCE_REVIEW, CHROME_PERFORMANCE_CAPTURE, QUALITY_GATES, `docs/performance/2026-10-18-native-devtools.json`.
+- Git: 기존 변경을 보존하며 미커밋·미푸시입니다.
+- 다음: 최초 진입 병목·최초 펼침 계측 간섭을 분리하고 FPS 전 구간 증거를 확보합니다. 초과값을 숨겨 통과 표본만 선택하지 않습니다.
+
 ## 이후 기록 양식
 
-다음 작업은 WH-044부터 추가합니다. 새 항목은 `남은 작업` 절 위에 추가하고 상단 목록·현재 상태·남은 작업을 함께 갱신합니다. 새 결과는 이전 기록을 대체하지 않습니다.
+다음 작업은 WH-053부터 추가합니다. 새 항목은 `남은 작업` 절 위에 추가하고 상단 목록·현재 상태·남은 작업을 함께 갱신합니다. 새 결과는 이전 기록을 대체하지 않습니다.
 
 ```markdown
-## WH-044 · 작업명
+## WH-053 · 작업명
 
 날짜: YYYY-MM-DD
 - 요청/목적:

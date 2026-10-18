@@ -70,6 +70,14 @@ public class ResourceService {
         return new Detail(base.resource(), java.util.Collections.unmodifiableMap(attributes), base.path());
     }
 
+    public List<java.util.Map<String, Object>> kubernetesEvents(ResourceType type, long id, int limit) {
+        ResourceQuery.requirePositiveId(id);
+        if (limit < 1 || limit > 20) {
+            throw ResourceRequestException.invalid("limit", "Kubernetes 이벤트 조회 수는 1~20이어야 합니다.");
+        }
+        return repository.kubernetesEvents(type, id, limit);
+    }
+
     public Path path(ResourceType type, long id) {
         return new Path(detail(type, id).path());
     }

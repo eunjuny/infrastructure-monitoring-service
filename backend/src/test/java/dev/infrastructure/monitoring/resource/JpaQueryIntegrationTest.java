@@ -113,7 +113,11 @@ class JpaQueryIntegrationTest {
         assertNoEntityGraph();
         statistics.clear();
         service.detailWithDiagnostics(ResourceType.POD, 1);
-        assertEquals(2, statistics.getPrepareStatementCount());
+        assertEquals(3, statistics.getPrepareStatementCount());
+        assertNoEntityGraph();
+        statistics.clear();
+        service.detailWithDiagnostics(ResourceType.NODE, 10);
+        assertEquals(3, statistics.getPrepareStatementCount());
         assertNoEntityGraph();
         statistics.clear();
         service.path(ResourceType.POD, 1);
@@ -123,7 +127,7 @@ class JpaQueryIntegrationTest {
     @Test void flywaySchemaIsMappedAndJpaOwnsTransactions() {
         assertInstanceOf(JpaTransactionManager.class, transactions);
         assertEquals(5, factory.getMetamodel().getEntities().size());
-        assertEquals(4, jdbc.queryForObject("select max(version::integer) from flyway_schema_history where success", Integer.class));
+        assertEquals(5, jdbc.queryForObject("select max(version::integer) from flyway_schema_history where success", Integer.class));
         assertEquals(150000, jdbc.queryForObject("select count(*) from infrastructure_pod", Integer.class));
     }
 

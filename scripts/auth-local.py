@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Provision an isolated local three-account realm; never print credentials."""
+"""Provision evaluation accounts or isolated CI accounts; never print secrets."""
 import json
 import argparse
 import http.client
@@ -15,6 +15,19 @@ ROOT = Path(__file__).resolve().parents[1]
 LOCAL = ROOT / '.local/auth'
 REALM = 'infrastructure-monitoring'
 ISSUER = 'http://127.0.0.1:8183/realms/' + REALM
+
+
+def initial_credentials(ci=False):
+    # Public evaluation fixtures only; infrastructure and CI credentials stay random.
+    return {
+        'users': {
+            key: {'username': username, 'password': secrets.token_urlsafe(24) if ci else '1234'}
+            for key, username in [('admin', 'admin'), ('a', 'user1'), ('b', 'user2')]
+        },
+        'bootstrap': secrets.token_urlsafe(32),
+        'appDatabase': secrets.token_urlsafe(32),
+        'identityDatabase': secrets.token_urlsafe(32),
+    }
 
 
 def validate_account_names(credentials):
@@ -88,7 +101,7 @@ def realm(credentials, web_origin='http://127.0.0.1:5176'):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--ci', action='store_true', help='Use fixed isolated CI ports, credentials and Compose project')
+    parser.add_argument('--ci', action='store_true', help='Use isolated CI ports and temporary credentials')
     parser.add_argument('--stop', action='store_true', help='Remove only CI containers/networks, preserving volumes/secrets')
     args = parser.parse_args()
     if args.stop and not args.ci:
@@ -117,10 +130,7 @@ def main():
     if credentials_path.exists() and not args.ci:
         credentials = json.loads(credentials_path.read_text())
     else:
-        credentials = {'users': {key: {'username': name, 'password': secrets.token_urlsafe(24)}
-                                for key, name in [('admin', 'admin'), ('a', 'user1'), ('b', 'user2')]},
-                       'bootstrap': secrets.token_urlsafe(32), 'appDatabase': secrets.token_urlsafe(32),
-                       'identityDatabase': secrets.token_urlsafe(32)}
+        credentials = initial_credentials(ci=args.ci)
         write_private(credentials_path, json.dumps(credentials, indent=2) + '\n')
     try:
         validate_account_names(credentials)

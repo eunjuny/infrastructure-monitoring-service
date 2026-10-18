@@ -1,15 +1,26 @@
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount, flushPromises, type VueWrapper } from '@vue/test-utils'
 import App from '../src/App.vue'
 import { api, ApiError, type Detail } from '../src/api'
 import { deferred, page, resource } from './fixtures'
 let wrapper: VueWrapper | undefined
 beforeAll(async () => { await import('../src/components/ResourceDetail.vue') })
+beforeEach(() => {
+  // Unit tests verify lifecycle/state; frame timing is tested separately with controlled RAFs.
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    void Promise.resolve().then(() => callback(performance.now()))
+    return 1
+  })
+})
 afterEach(() => { wrapper?.unmount(); wrapper = undefined })
 function setup() {
   const cluster = resource(1, 'CLUSTER'), node = resource(1, 'NODE'), namespace = resource(1, 'NAMESPACE'), pod = resource(1)
   const summary = vi.spyOn(api, 'summary').mockResolvedValue({ clusters: 20, nodes: 200, namespaces: 2000, pods: 100000 })
-  const list = vi.spyOn(api, 'list').mockResolvedValue(page([{ resource: pod, path: [] }]))
+  const list = vi.spyOn(api, 'list').mockImplementation(async scope => {
+    const selected = scope.q?.trim() ? pod : scope.type === 'CLUSTER' ? cluster : scope.type === 'NODE' ? node : scope.type === 'NAMESPACE' ? namespace : pod
+    const path = selected.type === 'POD' ? [cluster, node, namespace, pod] : selected.type === 'NODE' ? [cluster, node] : [cluster]
+    return page([{ resource: selected, path }])
+  })
   const detail = vi.spyOn(api, 'detail').mockImplementation(async r => ({ resource: r.type === 'POD' ? pod : r.type === 'NODE' ? node : r.type === 'NAMESPACE' ? namespace : cluster,
     path: r.type === 'POD' ? [cluster, node, namespace, pod] : r.type === 'NODE' ? [cluster, node] : [cluster], attributes: r.type === 'NODE' ? { cpuUsage: 17, memoryUsage: 23 } : { restartCount: 1 } }))
   const children = vi.spyOn(api, 'children').mockImplementation(async parent => page(!parent ? [cluster] : parent.type === 'CLUSTER' ? [node] : parent.type === 'NODE' ? [namespace] : [pod]))
@@ -18,6 +29,22 @@ function setup() {
 }
 const button = (text: string) => wrapper!.findAll('button').find(b => b.text() === text)!
 describe('screen to API connection', () => {
+  it('renders the primary list before starting hierarchy and summary work', async () => {
+    const frames: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => frames.push(callback))
+    const { children, summary } = setup()
+    await flushPromises()
+    expect(wrapper!.find('.resource-row').text()).toContain('cluster-1')
+    expect(children).not.toHaveBeenCalled()
+    expect(summary).not.toHaveBeenCalled()
+    expect(wrapper!.emitted('initialListSettled')).toBeUndefined()
+    frames.shift()!(0); await flushPromises()
+    expect(children).not.toHaveBeenCalled()
+    frames.shift()!(0); await flushPromises()
+    expect(wrapper!.emitted('initialListSettled')).toHaveLength(1)
+    await vi.waitFor(() => expect(summary).toHaveBeenCalledOnce())
+    expect(children).toHaveBeenCalledOnce()
+  })
   it('uses navigation shortcuts and summary cards to request the selected type', async () => {
     const { list } = setup(); await flushPromises()
     await wrapper!.findAll('.resource-navigation button')[1]!.trigger('click'); await flushPromises()
@@ -33,10 +60,10 @@ describe('screen to API connection', () => {
     expect(wrapper!.findAll('.resource-row .parent-cell')).toHaveLength(1)
     expect(wrapper!.find('.resource-row time').attributes('datetime')).toBe('2026-10-13T00:00:00Z')
   })
-  it('keeps data provenance and actions without implementation tutorials in the console', async () => {
+  it('keeps operating actions without fixture labels or implementation tutorials', async () => {
     setup(); await flushPromises()
-    expect(wrapper!.find('.environment-label').text()).toBe('MOCK DATA')
-    expect(wrapper!.find('.console-footer').text()).toContain('Mock 데이터 · 읽기 전용')
+    expect(wrapper!.find('.environment-label').exists()).toBe(false)
+    expect(wrapper!.find('.console-footer').text()).toContain('읽기 전용')
     expect(wrapper!.find('.explorer-note').exists()).toBe(false)
     expect(wrapper!.text()).not.toContain('서버에서 ID 순서대로 조회합니다.')
     expect(wrapper!.find('.scope-row').exists()).toBe(false)
@@ -71,6 +98,7 @@ describe('screen to API connection', () => {
   })
   it('switches detail tabs and navigates the typed relationship cards', async () => {
     setup(); await flushPromises()
+    await wrapper!.find('button[aria-label="Pod 전체 목록 보기"]').trigger('click'); await flushPromises()
     await wrapper!.find('.resource-row').trigger('click'); await flushPromises()
     await wrapper!.find('#path-tab').trigger('click')
     expect(wrapper!.find('#path-tab').attributes('aria-selected')).toBe('true')
@@ -106,13 +134,16 @@ describe('screen to API connection', () => {
     await vi.advanceTimersByTimeAsync(60000)
     expect(list).toHaveBeenCalledTimes(2); expect(wrapper!.text()).toContain('수동 갱신 모드')
   })
-  it('initially loads summary, root hierarchy and global Pod page only', async () => {
-    const { children, list } = setup(); await flushPromises()
+  it('initially loads summary, root hierarchy and top-level Cluster list', async () => {
+    const { children, list, summary } = setup(); await flushPromises()
+    await vi.waitFor(() => expect(summary).toHaveBeenCalledOnce())
+    await flushPromises()
     expect(wrapper!.text()).toContain('100,000')
-    expect(list).toHaveBeenCalledWith({ type: 'POD', q: '', status: '', parentId: undefined }, null, expect.any(AbortSignal))
+    expect(list).toHaveBeenCalledWith({ type: 'CLUSTER', q: '', status: '', parentId: undefined }, null, expect.any(AbortSignal))
     expect(children).toHaveBeenCalledTimes(1)
     expect(children.mock.calls[0]![0]).toBe(null)
     expect(wrapper!.findAll('.resource-row')).toHaveLength(1)
+    expect(wrapper!.find('.resource-row').text()).toContain('cluster-1')
   })
   it('lazily expands/collapses a branch without reloading cached children', async () => {
     const { children } = setup(); await flushPromises()
@@ -125,6 +156,7 @@ describe('screen to API connection', () => {
   })
   it('shows server detail, restart count and clickable full path', async () => {
     setup(); await flushPromises()
+    await wrapper!.find('button[aria-label="Pod 전체 목록 보기"]').trigger('click'); await flushPromises()
     await wrapper!.find('.resource-row').trigger('click'); await flushPromises()
     expect(wrapper!.find('.detail-panel').text()).toContain('재시작 횟수')
     expect(wrapper!.findAll('.breadcrumbs button').map(b => b.text())).toEqual(['cluster-1', 'node-1', 'namespace-1', 'pod-1'])
@@ -156,10 +188,11 @@ describe('screen to API connection', () => {
     await wrapper!.findAll('.filters select')[1]!.setValue('ERROR'); await flushPromises()
     expect(list.mock.calls.at(-1)![0]).toEqual({ type: '', parentId: undefined, status: 'ERROR', q: 'pod' })
     await wrapper!.find('.filters input').setValue(''); await wrapper!.find('form').trigger('submit'); await flushPromises()
-    expect(list.mock.calls.at(-1)![0].type).toBe('POD')
+    expect(list.mock.calls.at(-1)![0].type).toBe('CLUSTER')
   })
   it('reveals all ancestors of a selected search match', async () => {
     setup(); await flushPromises()
+    await wrapper!.find('button[aria-label="Pod 전체 목록 보기"]').trigger('click'); await flushPromises()
     await wrapper!.find('.resource-row').trigger('click'); await flushPromises()
     await button('계층에서 위치 보기').trigger('click'); await flushPromises()
     const text = wrapper!.find('.tree-panel').text()
@@ -167,7 +200,8 @@ describe('screen to API connection', () => {
     expect(wrapper!.findAll('.tree-item.selected')).toHaveLength(1)
   })
   it('refreshes statuses without clearing selected detail or rows while waiting', async () => {
-    const { list, pod } = setup(); await flushPromises()
+    const { list, pod, summary } = setup(); await flushPromises()
+    await wrapper!.find('button[aria-label="Pod 전체 목록 보기"]').trigger('click'); await flushPromises()
     await wrapper!.find('.resource-row').trigger('click'); await flushPromises()
     const pending = deferred<Awaited<ReturnType<typeof api.list>>>()
     list.mockReturnValueOnce(pending.promise)
@@ -178,6 +212,7 @@ describe('screen to API connection', () => {
     await flushPromises()
     expect(wrapper!.find('.resource-row .badge').text()).toBe('오류')
     expect(wrapper!.find('.resource-row.selected').exists()).toBe(true)
+    expect(summary).toHaveBeenCalledOnce()
   })
   it('ignores detail responses from previously selected resources', async () => {
     const { detail, cluster } = setup(); await flushPromises()

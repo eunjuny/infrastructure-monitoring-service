@@ -47,7 +47,7 @@ onBeforeUnmount(() => { controller?.abort(); polling.dispose() })
       <p class="scope-note">최근 확인 {{ fullTimestamp(data.fetchedAt) }}</p>
       <ul class="alert-rules">
         <li v-for="rule in data.rules" :key="rule.name" :class="`alert-${rule.state}`">
-          <div class="alert-heading"><strong>{{ rule.title }}</strong><span>{{ states[rule.state] }}{{ rule.state === 'firing' ? ` · ${rule.severity === 'critical' ? '심각' : '주의'}` : '' }}</span></div>
+          <div class="alert-heading"><strong>{{ rule.name === 'MockBatchFailures' ? '상태 갱신 반복 실패' : rule.title }}</strong><span>{{ states[rule.state] }}{{ rule.state === 'firing' ? ` · ${rule.severity === 'critical' ? '심각' : '주의'}` : '' }}</span></div>
           <p>{{ rule.condition }}</p>
           <p v-if="rule.activeAt">조건 시작 {{ fullTimestamp(rule.activeAt) }} · 관측값 {{ rule.value ?? '확인 불가' }}</p>
           <details><summary>확인·대응 방법</summary><p>{{ rule.response }}</p></details>

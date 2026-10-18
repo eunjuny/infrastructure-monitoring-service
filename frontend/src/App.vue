@@ -10,18 +10,20 @@ import ScopeFilters from './components/ScopeFilters.vue'
 import { fullTimestamp, shortTimestamp } from './timestamp'
 import { formatCount } from './count'
 import { session, logoutSession } from './session'
+import { recordPaintTiming } from './paintTiming'
+const emit = defineEmits<{ initialListSettled: [] }>()
 const ResourceDetail = defineAsyncComponent(() => import('./components/ResourceDetail.vue'))
 const OperationsDashboard = defineAsyncComponent(() => import('./components/OperationsDashboard.vue'))
 const summary = shallowRef<Summary | null>(null), summaryError = ref('')
 const selected = shallowRef<Reference | null>(null), detail = shallowRef<Detail | null>(null)
 const detailBusy = ref(false), detailError = ref(''), refreshing = ref(false), refreshedAt = ref('')
-const query = ref(''), type = ref<ResourceType | ''>('POD'), status = ref<ResourceStatus | ''>('')
+const query = ref(''), type = ref<ResourceType | ''>('CLUSTER'), status = ref<ResourceStatus | ''>('')
 const parent = shallowRef<Resource | null>(null)
 const scopeCluster = shallowRef<Reference | null>(null), scopeNamespace = shallowRef<Reference | null>(null)
 const hierarchyVisible = ref(false)
 const screen = ref<'resources' | 'operations'>('resources')
 async function logout() {
-  polling.dispose(); clearTimeout(timer); list.stop(true)
+  polling.dispose(); cancelInitialTiming?.(); clearTimeout(timer); clearTimeout(summaryStartTimer); list.stop(true)
   detailController?.abort(); summaryController?.abort(); closeDetail()
   list.rows.value = []; summary.value = null
   await logoutSession()
@@ -31,6 +33,7 @@ const summaryKeys = { CLUSTER: 'clusters', NODE: 'nodes', NAMESPACE: 'namespaces
 const typeLabels = { CLUSTER: 'Cluster', NODE: 'Node', NAMESPACE: 'Namespace', POD: 'Pod' } as const
 const typeDescriptions = { CLUSTER: '클러스터', NODE: '컴퓨팅 노드', NAMESPACE: '네임스페이스', POD: '워크로드' } as const
 const list = useResourceList()
+const initialListReady = ref(false)
 const tree = ref<InstanceType<typeof ResourceTree> | null>(null)
 const virtual = ref<{ reset(): void; discardRows(count: number): void } | null>(null)
 const keys = computed(() => list.rows.value.map(item => keyOf(item.resource)))
@@ -42,9 +45,12 @@ const windowStatuses = computed(() => {
 })
 const currentScopeLabel = computed(() => scopeNamespace.value?.name || scopeCluster.value?.name || (parent.value && !query.value.trim() ? parent.value.name : '전체 조회 범위'))
 let timer: ReturnType<typeof setTimeout> | undefined
+let summaryStartTimer: ReturnType<typeof setTimeout> | undefined
+let initialSummaryRequested = false
+let cancelInitialTiming: (() => void) | undefined
 let detailController: AbortController | undefined, summaryController: AbortController | undefined
 let detailRevision = 0, appliedScope = ''
-const scope = (): Scope => ({ type: query.value.trim() ? type.value : type.value || 'POD', q: query.value, status: status.value, parentId: query.value.trim() ? undefined : parent.value?.id,
+const scope = (): Scope => ({ type: query.value.trim() ? type.value : type.value || 'CLUSTER', q: query.value, status: status.value, parentId: query.value.trim() ? undefined : parent.value?.id,
   ...(scopeCluster.value ? { clusterId: scopeCluster.value.id } : {}), ...(scopeNamespace.value ? { namespaceId: scopeNamespace.value.id } : {}) })
 function changeScope(cluster: Reference | null, namespace: Reference | null) {
   scopeCluster.value = cluster; scopeNamespace.value = namespace; parent.value = null; closeDetail()
@@ -52,10 +58,21 @@ function changeScope(cluster: Reference | null, namespace: Reference | null) {
   void applyFilters()
 }
 async function applyFilters() {
-  if (!query.value.trim() && !type.value) type.value = 'POD'
+  if (!query.value.trim() && !type.value) type.value = 'CLUSTER'
   clearTimeout(timer); timer = undefined; virtual.value?.reset()
   const next = scope(); appliedScope = JSON.stringify(next)
   await list.reset(next)
+  if (!initialSummaryRequested && !list.busy.value && !list.error.value) {
+    initialSummaryRequested = true
+    // Paint the interactive first list before secondary hierarchy/aggregate work.
+    cancelInitialTiming = recordPaintTiming('First Cluster list', 0, () => {
+      emit('initialListSettled')
+      initialListReady.value = true
+      summaryStartTimer = setTimeout(() => { summaryStartTimer = undefined; void loadSummary() }, 0)
+    })
+  } else if (!initialSummaryRequested && list.error.value) {
+    emit('initialListSettled')
+  }
 }
 function searchInput() {
   // Immediately invalidate stale requests, even while debounce is pending.
@@ -120,10 +137,14 @@ async function refreshCurrent(automatic = false): Promise<boolean> {
   if (refreshing.value) return false
   clearTimeout(timer); timer = undefined; refreshing.value = true
   const sameScope = appliedScope === JSON.stringify(scope())
+  const retrySummary = !automatic && Boolean(summaryError.value)
   try {
-    await Promise.all([sameScope ? list.refresh() : applyFilters(), automatic ? undefined : loadSummary(), tree.value?.refresh(), refreshDetail()])
+    // Resource counts are structural fixture data and status changes never alter them.
+    // Keep the summary request out of the manual refresh path to avoid re-counting 150k rows.
+    await Promise.all([sameScope ? list.refresh() : applyFilters(), retrySummary ? loadSummary() : undefined,
+      tree.value?.refresh(), refreshDetail()])
     refreshedAt.value = shortTimestamp(new Date().toISOString())
-    return !list.error.value && !detailError.value && !tree.value?.hasError() && (automatic || !summaryError.value)
+    return !list.error.value && !detailError.value && !tree.value?.hasError() && (!retrySummary || !summaryError.value)
   } finally { refreshing.value = false }
 }
 function cancelPollingRequests() {
@@ -140,18 +161,18 @@ async function reveal() {
 function globalPods() { closeDetail(); scopeCluster.value = null; scopeNamespace.value = null; parent.value = null; query.value = ''; type.value = 'POD'; status.value = ''; void applyFilters() }
 function date(value: string) { return fullTimestamp(value) }
 const statusLabel = (value: ResourceStatus) => ({ NORMAL: '정상', WARNING: '주의', ERROR: '오류' })[value]
-// Start independent I/O during setup so it overlaps the first DOM construction.
-void loadSummary(); void applyFilters()
+// Prioritize the first Cluster page; secondary summaries start after its response.
+void applyFilters()
 onMounted(() => { polling.start(); window.addEventListener('keydown', shortcut) })
-onBeforeUnmount(() => { polling.dispose(); clearTimeout(timer); list.stop(); detailController?.abort(); summaryController?.abort(); detailRevision++; window.removeEventListener('keydown', shortcut) })
+onBeforeUnmount(() => { polling.dispose(); cancelInitialTiming?.(); clearTimeout(timer); clearTimeout(summaryStartTimer); list.stop(); detailController?.abort(); summaryController?.abort(); detailRevision++; window.removeEventListener('keydown', shortcut) })
 </script>
 <template>
   <main class="app-shell">
     <header class="topbar">
       <div class="brand"><span class="brand-mark"><UiIcon name="layers" /></span><span>Infra Monitor<small>Infrastructure console</small></span></div>
-      <div class="topbar-context"><span>{{ screen === 'resources' ? '리소스 탐색' : '운영 관측' }}</span><UiIcon name="chevron" /><strong>{{ screen === 'resources' ? type ? typeLabels[type] : '모든 유형' : 'Spring Boot · DB' }}</strong><span class="environment-label">MOCK DATA</span></div>
+      <div class="topbar-context"><span>{{ screen === 'resources' ? '리소스 탐색' : '운영 관측' }}</span><UiIcon name="chevron" /><strong>{{ screen === 'resources' ? type ? typeLabels[type] : '모든 유형' : 'Spring Boot · DB' }}</strong></div>
       <nav class="screen-tabs" aria-label="콘솔 화면"><button :aria-pressed="screen === 'resources'" @click="screen = 'resources'">리소스</button><button v-if="!session.enabled || session.administrator" :aria-pressed="screen === 'operations'" @click="screen = 'operations'">운영 관측</button></nav>
-      <div v-if="session.enabled" class="session-info"><span>{{ session.name }} · {{ session.administrator ? '전체 관리자' : `조회 가능 Cluster ${session.clusters.length}개` }}</span><button @click="logout">로그아웃</button></div>
+      <div v-if="session.enabled" class="session-info"><span>{{ session.identityReady ? `${session.name} · ${session.administrator ? '전체 관리자' : `조회 가능 Cluster ${session.clusters.length}개`}` : session.identityError ? '계정 권한 확인 실패 · 새로고침해 주세요' : '계정 권한 확인 중' }}</span><button @click="logout">로그아웃</button></div>
       <div v-show="screen === 'resources'" class="refresh-controls">
         <label class="polling-toggle"><input type="checkbox" :checked="polling.enabled.value" @change="polling.setEnabled(($event.target as HTMLInputElement).checked)" />자동 갱신</label>
         <span class="polling-state" :class="{ paused: !polling.enabled.value || polling.paused.value, failed: polling.failures.value > 0 }" role="status">{{ !polling.enabled.value ? '수동 갱신 모드' : polling.paused.value ? '백그라운드·오프라인 대기' : polling.failures.value ? `${polling.delay.value / 1000}초 뒤 재시도` : '자동 갱신 활성' }}</span>
@@ -168,7 +189,7 @@ onBeforeUnmount(() => { polling.dispose(); clearTimeout(timer); list.stop(); det
             <UiIcon :name="resourceType" /><span>{{ typeLabels[resourceType] }}</span><small>{{ summary ? formatCount(summary[summaryKeys[resourceType]]) : '—' }}</small>
           </button>
         </nav>
-        <ResourceTree ref="tree" :selected="selectedKey" @select="select" @browse="browse" />
+        <ResourceTree ref="tree" :selected="selectedKey" :initial-ready="initialListReady" @select="select" @browse="browse" />
       </aside>
       <div class="content-area">
         <div class="page-header"><h1>인프라 리소스 모니터링</h1><span class="scope-badge"><UiIcon name="layers" />{{ currentScopeLabel }}</span></div>
@@ -210,7 +231,7 @@ onBeforeUnmount(() => { polling.dispose(); clearTimeout(timer); list.stop(); det
           </section>
           <ResourceDetail v-if="selected" :selected="selected" :detail="detail" :busy="detailBusy" :error="detailError" @select="select" @close="closeDetail" @browse="browse" @reveal="reveal" />
         </div>
-        <footer class="console-footer"><span>Mock 데이터 · 읽기 전용</span><span v-if="refreshedAt">마지막 조회 시도 {{ refreshedAt }}</span></footer>
+        <footer class="console-footer"><span>읽기 전용</span><span v-if="refreshedAt">마지막 조회 시도 {{ refreshedAt }}</span></footer>
       </div>
     </div>
   </main>

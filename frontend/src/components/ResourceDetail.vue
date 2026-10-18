@@ -5,13 +5,14 @@ import { fullTimestamp } from '../timestamp'
 import UiIcon from './UiIcon.vue'
 import ResourceDiagnosticsPanel from './ResourceDiagnosticsPanel.vue'
 const ResourceEvents = defineAsyncComponent(() => import('./ResourceEvents.vue'))
+const KubernetesEvents = defineAsyncComponent(() => import('./KubernetesEvents.vue'))
 const { selected, detail, busy, error } = defineProps<{ selected: Reference; detail: Detail | null; busy: boolean; error: string }>()
 const emit = defineEmits<{ select: [resource: Reference]; browse: [resource: Resource]; close: []; reveal: [] }>()
-const tab = ref<'overview' | 'path'>('overview'), showEvents = ref(false)
+const tab = ref<'overview' | 'path'>('overview'), showEvents = ref(false), showKubernetesEvents = ref(false)
 const overviewTab = ref<HTMLButtonElement | null>(null), pathTab = ref<HTMLButtonElement | null>(null)
 const typeLabels = { CLUSTER: 'Cluster', NODE: 'Node', NAMESPACE: 'Namespace', POD: 'Pod' } as const
 const statusLabels = { NORMAL: '정상', WARNING: '주의', ERROR: '오류' } as const
-watchEffect(() => { if (busy && !detail) { tab.value = 'overview'; showEvents.value = false } })
+watchEffect(() => { if (busy && !detail) { tab.value = 'overview'; showEvents.value = false; showKubernetesEvents.value = false } })
 function switchTab(next: 'overview' | 'path', focus = false) {
   tab.value = next
   if (focus) void nextTick(() => { (next === 'overview' ? overviewTab.value : pathTab.value)?.focus() })
@@ -41,6 +42,8 @@ function attributeName(key: string) { return ({ cpuUsage: 'CPU 사용률 (%)', m
       <button v-if="detail.resource.hasChildren" class="primary child-button" @click="emit('browse', detail.resource)">하위 {{ childType(detail.resource.type) }} 목록 보기<UiIcon name="arrow" /></button>
       <button class="reveal-button" :aria-expanded="showEvents" @click="showEvents = !showEvents">{{ showEvents ? '변경 이력 접기' : '변경 이력 보기' }}</button>
       <ResourceEvents v-if="showEvents" :resource="detail.resource" />
+      <button class="reveal-button" :aria-expanded="showKubernetesEvents" @click="showKubernetesEvents = !showKubernetesEvents">{{ showKubernetesEvents ? '이벤트 접기' : '이벤트 보기' }}</button>
+      <KubernetesEvents v-if="showKubernetesEvents" :resource="detail.resource" />
     </template>
   </aside>
 </template>

@@ -66,6 +66,10 @@ class ResourceDiagnosticsIntegrationTest {
         jdbc.update("update infrastructure_node set status='ERROR' where id=2");
         assertEquals(false, service.detailWithDiagnostics(ResourceType.NODE, 2).attributes().get("ready"));
         assertEquals(24, service.detailWithDiagnostics(ResourceType.NODE, 2).attributes().get("cpuCapacityCores"));
+        var node = service.detailWithDiagnostics(ResourceType.NODE, 10).attributes();
+        assertEquals(2, ((java.util.List<?>) node.get("gpuDevices")).size());
+        assertTrue(((Number) node.get("cpuUsageCores")).doubleValue() >= 0);
+        assertTrue(((Number) node.get("cpuAllocatableCores")).doubleValue() > 0);
         jdbc.update("update infrastructure_pod set status='ERROR' where id=2");
         var failed = service.detailWithDiagnostics(ResourceType.POD, 2).attributes();
         assertEquals("Running", failed.get("phase"));
@@ -76,6 +80,19 @@ class ResourceDiagnosticsIntegrationTest {
         var recovered = service.detailWithDiagnostics(ResourceType.POD, 2).attributes();
         assertEquals(recovered.get("containerCount"), recovered.get("readyContainerCount"));
         assertNull(recovered.get("failureReason"));
+        assertEquals(1, ((java.util.List<?>) recovered.get("containers")).size());
+        var sidecarPod = service.detailWithDiagnostics(ResourceType.POD, 3).attributes();
+        assertEquals(2, ((java.util.List<?>) sidecarPod.get("containers")).size());
+    }
+
+    @Test void seededKubernetesEventsAreScopedAndBounded() {
+        var warning = service.kubernetesEvents(ResourceType.POD, 4, 20);
+        assertEquals("FailedScheduling", warning.get(0).get("reason"));
+        assertTrue(service.kubernetesEvents(ResourceType.POD, 1, 20).isEmpty());
+        assertThrows(ResourceRequestException.class, () -> service.kubernetesEvents(ResourceType.POD, 4, 21));
+        assertThrows(ResourceRequestException.class, () -> service.kubernetesEvents(ResourceType.POD, 999999, 20));
+        assertTrue(jdbc.queryForObject("select count(*) from infrastructure_pod_container", Long.class) > 150000);
+        assertEquals(40L, jdbc.queryForObject("select count(*) from infrastructure_node_gpu", Long.class));
     }
 
     @Test void missingResourceDoesNotBecomeAnEmptySuccessfulAggregate() {
@@ -109,6 +126,12 @@ class ResourceDiagnosticsIntegrationTest {
             assertTrue(result.getString(5).startsWith("2026-01-01"));
             assertEquals(1, result.getInt(6));
             assertTrue(result.getString(7).contains("mock/worker"));
+        }
+        try (var connection = DriverManager.getConnection(url, DB.getUsername(), DB.getPassword());
+             var statement = connection.createStatement();
+             var result = statement.executeQuery("select count(*) from infrastructure_pod_container where pod_id=1")) {
+            assertTrue(result.next());
+            assertEquals(1, result.getInt(1));
         }
     }
 }

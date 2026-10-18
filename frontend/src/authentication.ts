@@ -11,12 +11,10 @@ export async function initializeAuthentication(config: AuthenticationConfigurati
     throw new Error('인증 서버는 HTTPS 또는 로컬 개발 주소여야 합니다.')
   }
   const client = new Keycloak({ url: config.issuer.split('/realms/')[0], realm: 'infrastructure-monitoring', clientId: config.clientId })
-  const ready = await client.init({ onLoad: 'check-sso', pkceMethod: 'S256', checkLoginIframe: false,
-    silentCheckSsoRedirectUri: window.location.origin + '/silent-check-sso.html',
+  const ready = await client.init({ onLoad: 'login-required', pkceMethod: 'S256', checkLoginIframe: false,
     redirectUri: window.location.origin + '/' })
   if (!ready) {
-    // No session: use the normal login page, never mount anonymously.
-    await client.login({ redirectUri: window.location.origin + '/' })
+    // Authentication is mandatory; never mount anonymously if the redirect cannot complete.
     throw new Error('로그인이 필요합니다.')
   }
   let refreshing: Promise<boolean> | undefined
@@ -26,6 +24,15 @@ export async function initializeAuthentication(config: AuthenticationConfigurati
     if (!client.token) throw new Error('로그인이 만료되었습니다. 다시 접속해 주세요.')
     return client.token
   }, () => client.logout({ redirectUri: window.location.origin + '/' }))
-  const user = await api.me()
-  Object.assign(session, user, { enabled: true })
+  Object.assign(session, { enabled: true, identityReady: false, identityError: false })
+}
+
+export async function loadAuthenticatedIdentity() {
+  try {
+    const user = await api.me()
+    Object.assign(session, user, { enabled: true, identityReady: true, identityError: false })
+  } catch (error) {
+    Object.assign(session, { identityReady: false, identityError: true })
+    throw error
+  }
 }

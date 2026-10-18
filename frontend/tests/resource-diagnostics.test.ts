@@ -26,6 +26,32 @@ it('renders node condition booleans and capacity units clearly', () => {
   expect(wrapper.text()).toContain('16 코어')
   expect(wrapper.text()).toContain('32 GiB')
 })
+it('labels stored CPU and memory requests distinctly without claiming an aggregate', () => {
+  const wrapper = panel('NODE', { cpuRequestedCores: 7.2, memoryRequestedMiB: 8192, diagnosticSource: 'MOCK' })
+  expect(wrapper.text()).toContain('Pod CPU 요청량')
+  expect(wrapper.text()).toContain('Pod 메모리 요청량')
+  expect(wrapper.text()).not.toMatch(/Mock|시나리오/)
+  expect(wrapper.text()).toContain('7.2 코어')
+  expect(wrapper.text()).toContain('8.0 GiB')
+  expect(wrapper.text()).not.toContain('Pod 요청 합계')
+})
+it('converts fractional measured memory usage without discarding the value as a missing count', () => {
+  const wrapper = panel('NODE', { cpuUsageCores: 4.8, memoryUsageMiB: 6553.6 })
+  expect(wrapper.text()).toContain('4.8 코어')
+  expect(wrapper.text()).toContain('6.4 GiB')
+  expect(wrapper.text()).not.toContain('—')
+})
+it.each([Number.NaN, Number.POSITIVE_INFINITY, -1])('does not present invalid memory usage %s as a real value', value => {
+  const wrapper = panel('NODE', { memoryUsageMiB: value })
+  expect(wrapper.text()).toContain('—')
+  expect(wrapper.text()).not.toContain('GiB')
+})
+it('shows GPU properties without data-origin banners', () => {
+  const wrapper = panel('NODE', { diagnosticSource: 'MOCK', gpuDevices: [{ name: 'gpu-0', model: 'NVIDIA A100', memoryMiB: 40960, utilizationPercent: 65, temperatureCelsius: 60, allocatedPods: 2 }] })
+  expect(wrapper.text()).toContain('GPU 장치')
+  expect(wrapper.text()).toContain('65%')
+  expect(wrapper.text()).not.toMatch(/Mock|생성 데이터|시나리오/)
+})
 it('separates Running phase from CrashLoopBackOff and termination cause', () => {
   const wrapper = panel('POD', { phase: 'Running', containerCount: 2, readyContainerCount: 0, containerState: 'Waiting', failureReason: 'CrashLoopBackOff', lastTerminationReason: 'OOMKilled', image: 'registry.example.invalid/mock/worker:1.0.0', workloadKind: 'Deployment', workloadName: 'mock-worker-01', restartCount: 8 })
   for (const value of ['Running', '0 / 2', 'Waiting', 'CrashLoopBackOff', 'OOMKilled', 'Deployment', 'mock-worker-01', '8 회']) expect(wrapper.text()).toContain(value)

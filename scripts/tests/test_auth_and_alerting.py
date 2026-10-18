@@ -1,10 +1,14 @@
 """Offline checks for CI secret separation, sanitized reports and bounded inbox."""
 import importlib.util
+import io
+import json
 import os
 from pathlib import Path
 import subprocess
+from contextlib import redirect_stdout
 from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -22,6 +26,40 @@ RECEIVER = load('alert_receiver', 'infra/alertmanager/receiver.py')
 
 
 class AuthenticationAndAlertsTest(unittest.TestCase):
+    def test_fresh_evaluation_creates_demo_accounts_and_preserves_settings_on_restart(self):
+        with TemporaryDirectory(prefix='monitoring-evaluation-') as directory:
+            root = Path(directory)
+            output = io.StringIO()
+            discovery = {'issuer': AUTH.ISSUER}
+            config = {'enabled': True, 'issuer': AUTH.ISSUER}
+            responses = [io.BytesIO(json.dumps(body).encode()) for body in [discovery, config] * 2]
+            commands = [subprocess.CompletedProcess([], code) for code in [1, 0] * 2]
+            with patch.object(AUTH, 'ROOT', root), patch.object(AUTH, 'LOCAL', root / '.local/auth'), \
+                    patch('sys.argv', ['auth-local.py']), \
+                    patch.object(AUTH.subprocess, 'run', side_effect=commands), \
+                    patch.object(AUTH.urllib.request, 'urlopen', side_effect=responses), redirect_stdout(output):
+                AUTH.main()
+                path = root / '.local/auth/credentials.json'
+                first = json.loads(path.read_text())
+                imported = json.loads((path.parent / 'realm.json').read_text())
+                self.assertEqual(['admin', 'user1', 'user2'], [user['username'] for user in imported['users']])
+                self.assertEqual(['1234'] * 3, [user['credentials'][0]['value'] for user in imported['users']])
+                self.assertEqual(0o600, path.stat().st_mode & 0o777)
+                AUTH.main()
+                self.assertEqual(first, json.loads(path.read_text()))
+            for key in ['bootstrap', 'appDatabase', 'identityDatabase', 'databaseAdmin', 'alertEmailControl']:
+                self.assertGreaterEqual(len(first[key]), 32)
+                self.assertNotIn(first[key], output.getvalue())
+
+    def test_ci_accounts_keep_distinct_random_passwords(self):
+        first = AUTH.initial_credentials(ci=True)
+        second = AUTH.initial_credentials(ci=True)
+        passwords = [user['password'] for user in first['users'].values()]
+        self.assertEqual(3, len(set(passwords)))
+        self.assertNotIn('1234', passwords)
+        self.assertTrue(all(len(password) >= 24 for password in passwords))
+        self.assertNotEqual(first, second)
+
     def test_smtp_file_revision_recreates_readers_without_exposing_secret_values(self):
         with TemporaryDirectory(prefix='monitoring-mail-revision-') as directory:
             local = Path(directory)

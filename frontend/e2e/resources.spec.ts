@@ -12,6 +12,7 @@ test.beforeEach(async ({ page, request }) => {
 
 test('real seed counts, lazy hierarchy, parent list and typed details', async ({ page }) => {
   await expect(page.locator('.cards')).toContainText('150,000')
+  await expect(page.locator('.resource-row').first()).toContainText('cluster-01')
   await expect(page.locator('.tree-panel')).toContainText('cluster-01')
   await expect(page.locator('.tree-panel')).not.toContainText('node-001')
   await page.getByRole('button', { name: 'cluster-01 펼치기', exact: true }).click()
@@ -23,10 +24,18 @@ test('real seed counts, lazy hierarchy, parent list and typed details', async ({
   await page.locator('.resource-row').filter({ hasText: 'worker-pod-000001' }).click()
   await expect(page.locator('.detail-panel h3')).toHaveText('worker-pod-000001')
   await expect(page.locator('.attributes')).toContainText('재시작 횟수')
+  await expect(page.locator('.resource-diagnostics')).toContainText('컨테이너별 상태')
+  await page.getByRole('button', { name: '이벤트 보기', exact: true }).click()
+  await expect(page.locator('.event-history')).toContainText('리소스 이벤트')
+  await expect(page.locator('.event-history')).not.toContainText('생성한 이벤트')
   await expect(page.locator('.breadcrumbs button')).toHaveCount(4)
   await page.locator('.breadcrumbs button').filter({ hasText: 'node-001' }).click()
   await expect(page.locator('.attributes')).toContainText('CPU 사용률 (%)')
   await expect(page.locator('.attributes')).toContainText('메모리 사용률 (%)')
+  await page.getByRole('button', { name: 'Node 전체 목록 보기' }).click()
+  await page.locator('.resource-row').filter({ hasText: 'node-010' }).click()
+  await expect(page.locator('.resource-diagnostics')).toContainText('GPU 장치')
+  await expect(page.locator('.resource-diagnostics')).toContainText('할당 가능')
 })
 
 test('optional code is loaded on demand while initial data and timestamps remain complete', async ({ page }) => {
@@ -104,13 +113,13 @@ test('committed mock changes have readable history', async ({ page, request }) =
   await page.getByRole('button', { name: 'Node 전체 목록 보기' }).click()
   await page.locator('.resource-row').first().click()
   await page.getByRole('button', { name: '변경 이력 보기', exact: true }).click()
-  await expect(page.locator('.event-history')).toContainText('시뮬레이터')
+  await expect(page.locator('.event-history')).toContainText('상태 변경 이력')
   const response = await request.get('/api/resources/NODE/1/events')
   expect(response.status()).toBe(200)
   expect((await response.json()).maximumEvents).toBe(20000)
   await expect.poll(async () => (await (await request.get('/api/resources/NODE/1/events')).json()).items.length, { timeout: 15000 }).toBeGreaterThan(0)
   await page.getByRole('button', { name: '이력 새로고침', exact: true }).click()
-  await expect(page.locator('.event-history li').first()).toContainText('Mock 시뮬레이터')
+  await expect(page.locator('.event-history li').first()).toContainText('→')
 })
 
 test('operations screen displays actual Prometheus samples', async ({ page, request }) => {

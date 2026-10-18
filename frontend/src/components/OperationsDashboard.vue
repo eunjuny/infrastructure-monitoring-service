@@ -15,9 +15,9 @@ const metrics = [
   { key: 'dbActive', title: 'DB 사용 중 연결', unit: '개', scale: 1 },
 ]
 const simulatorMetrics = [
-  { key: 'mockChanged', title: 'Mock 변경 행 추정 / 5분', unit: '행', scale: 1 },
-  { key: 'mockFailures', title: 'Mock 실패 / 5분', unit: '회', scale: 1 },
-  { key: 'mockP95', title: 'Mock 배치 p95 / 5분', unit: 'ms', scale: 1000 },
+  { key: 'mockChanged', title: '상태 갱신 행 추정 / 5분', unit: '행', scale: 1 },
+  { key: 'mockFailures', title: '상태 갱신 실패 / 5분', unit: '회', scale: 1 },
+  { key: 'mockP95', title: '상태 갱신 배치 p95 / 5분', unit: 'ms', scale: 1000 },
 ]
 function display(key: string, scale: number) {
   const value = data.value?.values[key]
@@ -61,7 +61,7 @@ onBeforeUnmount(() => { controller?.abort(); polling.dispose() })
       <p class="scope-note operations-meta">{{ data.source }} · 최근 조회 {{ new Date(data.fetchedAt).toLocaleTimeString('ko-KR') }}</p>
       <dl class="operation-cards" aria-label="서비스 운영 지표"><div v-for="metric in metrics" :key="metric.key"><dt>{{ metric.title }}</dt><dd>{{ display(metric.key, metric.scale) }} <small v-if="metric.unit && data.values[metric.key] != null && Number.isFinite(data.values[metric.key])">{{ metric.unit }}</small></dd></div></dl>
       <div class="operation-charts"><section v-for="chart in [{ key: 'apiP95', title: 'API p95 추이' }, { key: 'queryP95', title: 'DB 조회 p95 추이' }]" :key="chart.key" class="panel"><div class="chart-heading"><h2>{{ chart.title }}</h2><span>최근 30분 · 5분 구간 p95</span></div><template v-if="lines(chart.key).length"><small>0–{{ chartMaximum(chart.key).toFixed(1) }}ms</small><svg viewBox="0 0 600 160" role="img" :aria-label="chart.title"><path d="M0 140H580" stroke="#cbd5e1" /><polyline v-for="(line, index) in lines(chart.key)" :key="index" :points="line" fill="none" stroke="#2563eb" stroke-width="2" /></svg><div class="chart-time-axis"><span>30분 전</span><span>최근</span></div></template><p v-else class="chart-empty">최근 30분간 추이 표본 없음</p></section></div>
-      <details class="simulator-metrics panel"><summary>Mock 시뮬레이터 지표</summary><dl class="operation-cards" aria-label="Mock 시뮬레이터 지표"><div v-for="metric in simulatorMetrics" :key="metric.key"><dt>{{ metric.title }}</dt><dd>{{ display(metric.key, metric.scale) }} <small v-if="data.values[metric.key] != null && Number.isFinite(data.values[metric.key])">{{ metric.unit }}</small></dd></div></dl></details>
+      <details class="simulator-metrics panel"><summary>상태 갱신 배치 지표</summary><dl class="operation-cards" aria-label="상태 갱신 배치 지표"><div v-for="metric in simulatorMetrics" :key="metric.key"><dt>{{ metric.title }}</dt><dd>{{ display(metric.key, metric.scale) }} <small v-if="data.values[metric.key] != null && Number.isFinite(data.values[metric.key])">{{ metric.unit }}</small></dd></div></dl></details>
     </template>
     <OperationsAlerts />
   </section>

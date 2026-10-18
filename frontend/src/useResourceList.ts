@@ -5,7 +5,7 @@ type LoadedPage = { cursor: string | null; items: SearchResult[]; next: string |
 export function useResourceList() {
   const rows = shallowRef<SearchResult[]>([])
   const busy = ref(false), error = ref(''), offset = ref(0), hasMore = ref(false)
-  let pages: LoadedPage[] = [], scope: Scope = { type: 'POD', q: '', status: '' }
+  let pages: LoadedPage[] = [], scope: Scope = { type: 'CLUSTER', q: '', status: '' }
   let controller: AbortController | undefined, revision = 0
   function start() {
     controller?.abort(); controller = new AbortController()

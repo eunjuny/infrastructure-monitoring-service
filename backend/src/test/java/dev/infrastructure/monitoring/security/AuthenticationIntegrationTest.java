@@ -149,7 +149,7 @@ class AuthenticationIntegrationTest {
         for (boolean a : List.of(true, false)) {
             long pod = a ? 50001 : 1;
             String bearer = "Bearer " + viewer(a);
-            for (String suffix : List.of("", "/path", "/events")) {
+            for (String suffix : List.of("", "/path", "/events", "/kubernetes-events")) {
                 mvc.perform(get("/api/resources/POD/" + pod + suffix).header(HttpHeaders.AUTHORIZATION, bearer))
                         .andExpect(status().isNotFound());
             }

@@ -120,6 +120,24 @@ class MockStateIntegrationTest {
         assertEquals(1,history.list(ResourceType.POD,1,newest.id(),20).size());
     }
 
+    @Test void simulatorKeepsContainerSnapshotsAndCurrentKubernetesEventsInSync() {
+        var tx = new org.springframework.transaction.support.TransactionTemplate(manager);
+        var time = Instant.parse("2030-01-01T00:00:00Z");
+        tx.execute(status -> repository.change(ResourceType.POD, List.of(1L), time));
+        assertEquals("WAITING", jdbc.queryForObject(
+                "select state from infrastructure_pod_container where pod_id=1 and name='application'", String.class));
+        assertEquals(1, jdbc.queryForObject("select count(*) from infrastructure_kubernetes_event"
+                + " where resource_type='POD' and resource_id=1", Integer.class));
+        tx.execute(status -> repository.change(ResourceType.POD, List.of(1L), time.plusSeconds(1)));
+        assertEquals("ERROR", jdbc.queryForObject("select status from infrastructure_pod where id=1", String.class));
+        tx.execute(status -> repository.change(ResourceType.POD, List.of(1L), time.plusSeconds(2)));
+        assertEquals("NORMAL", jdbc.queryForObject("select status from infrastructure_pod where id=1", String.class));
+        assertEquals(0, jdbc.queryForObject("select count(*) from infrastructure_kubernetes_event"
+                + " where resource_type='POD' and resource_id=1", Integer.class));
+        assertEquals(3, jdbc.queryForObject("select count(*) from resource_change_event"
+                + " where resource_type='POD' and resource_id=1", Integer.class));
+    }
+
     @Test void retentionCleanupIsBoundedAndKeepsNewestRows() {
         service(repository).advance();
         assertEquals(10,history.cleanup(24,100,10));

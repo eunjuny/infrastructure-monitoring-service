@@ -2,7 +2,7 @@
 
 ## 전환 목적과 범위
 
-2026-10-18 진단 확장에서는 V4 정적 메타데이터를 매핑하고, 상세 전용 HQL scalar 집계/조회만 추가합니다. 목록 projection/SQL 1회·Entity 로딩 0은 유지하고 Cluster 진단 3회·나머지 진단 2회·path 1회·이력 2회로 제한합니다. 권한 조건은 새 쿼리에도 바인딩하며 REPEATABLE_READ 상세 snapshot에서 상태/집계를 읽습니다. [정의·API·이행·검증](RESOURCE_DIAGNOSTICS.md)을 참고하고 아래 V1~V3 유지 설명은 원래 JPA 전환 당시 기록입니다.
+2026-10-18 진단 확장에서는 V5 진단 테이블을 매핑하고 상세 전용 HQL scalar 집계/조회만 추가합니다. 목록 projection/SQL 1회·Entity 로딩 0은 유지하고 Cluster 3 SQL·Namespace 2·Node 3·Pod 3·path 1·이력 2로 제한합니다. Node GPU·Pod 컨테이너 자식 행은 해당 상세에서만 최대 8/4행으로 조회하며 이벤트는 리소스 접근을 다시 확인하는 별도 API에서 최대 20행입니다. [정의·API·이행·검증](RESOURCE_DIAGNOSTICS.md)을 참고합니다.
 
 과제 가이드는 백엔드 기술을 제한하지 않습니다. 채용공고의 JPA/Hibernate 활용·성능 고려 요구와 사용자 요청에 맞춰 기존 JDBC 구현을 **JPA/Hibernate Entity 매핑 + DTO projection**으로 전환했습니다. JPA가 JDBC보다 빠르다는 주장이나 실무 운영 경험의 대체가 아닙니다.
 

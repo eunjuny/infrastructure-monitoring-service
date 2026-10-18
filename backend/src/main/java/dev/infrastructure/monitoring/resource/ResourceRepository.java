@@ -67,17 +67,86 @@ public class ResourceRepository {
                 yield Map.of("podCount", pods[0], "errorPodCount", pods[1], "notReadyPodCount", pods[2]);
             }
             case NODE -> {
-                var node = diagnosticRow("select r.cpuCapacityCores, r.memoryCapacityMiB from NodeResource r"
+                var node = diagnosticRow("select r.cpuCapacityCores, r.memoryCapacityMiB, r.cpuAllocatableCores,"
+                        + " r.cpuRequestedCores, r.memoryAllocatableMiB, r.memoryRequestedMiB, r.cpuUsage, r.memoryUsage"
+                        + " from NodeResource r"
                         + " where r.id = :id" + accessWhere(type), id);
-                yield MockDiagnostics.node(resource.status(), id, (Number) node[0], (Number) node[1]);
+                var values = new LinkedHashMap<String, Object>(
+                        MockDiagnostics.node(resource.status(), id, (Number) node[0], (Number) node[1]));
+                values.put("cpuAllocatableCores", node[2]);
+                values.put("cpuRequestedCores", node[3]);
+                values.put("cpuUsageCores", ((Number) node[0]).doubleValue()
+                        * ((Number) node[6]).doubleValue() / 100.0);
+                values.put("memoryAllocatableMiB", node[4]);
+                values.put("memoryRequestedMiB", node[5]);
+                values.put("memoryUsageMiB", ((Number) node[1]).doubleValue()
+                        * ((Number) node[7]).doubleValue() / 100.0);
+                values.put("gpuDevices", gpuDevices(id));
+                yield Collections.unmodifiableMap(values);
             }
             case POD -> {
                 var pod = diagnosticRow("select r.containerCount, r.image, r.workloadKind, r.workloadName"
                         + " from PodResource r where r.id = :id" + accessWhere(type), id);
-                yield MockDiagnostics.pod(resource.status(), id, ((Number) pod[0]).intValue(),
-                        (String) pod[1], (String) pod[2], (String) pod[3]);
+                var values = new LinkedHashMap<String, Object>(MockDiagnostics.pod(resource.status(), id,
+                        ((Number) pod[0]).intValue(), (String) pod[1], (String) pod[2], (String) pod[3]));
+                values.put("containers", containers(id));
+                yield Collections.unmodifiableMap(values);
             }
         };
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> gpuDevices(long nodeId) {
+        var rows = entityManager.createNativeQuery("select device_name, model, memory_mib, utilization_percent,"
+                + " temperature_celsius, allocated_pods, updated_at from infrastructure_node_gpu"
+                + " where node_id = :id order by id limit 8")
+                .setParameter("id", nodeId).setHint("jakarta.persistence.query.timeout", timeoutMillis).getResultList();
+        return ((List<Object[]>) rows).stream().map(row -> Map.<String, Object>of(
+                "name", row[0], "model", row[1], "memoryMiB", row[2], "utilizationPercent", row[3],
+                "temperatureCelsius", row[4], "allocatedPods", row[5], "updatedAt", row[6])).toList();
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> containers(long podId) {
+        var rows = entityManager.createNativeQuery("select name, image, state, ready, restart_count,"
+                + " cpu_request_millicores, cpu_usage_millicores, memory_request_mib, memory_usage_mib"
+                + " from infrastructure_pod_container where pod_id = :id order by id limit 4")
+                .setParameter("id", podId).setHint("jakarta.persistence.query.timeout", timeoutMillis).getResultList();
+        return ((List<Object[]>) rows).stream().map(row -> Map.<String, Object>of(
+                "name", row[0], "image", row[1], "state", row[2], "ready", row[3], "restartCount", row[4],
+                "cpuRequestMillicores", row[5], "cpuUsageMillicores", row[6],
+                "memoryRequestMiB", row[7], "memoryUsageMiB", row[8])).toList();
+    }
+
+    public List<Map<String, Object>> kubernetesEvents(ResourceType type, long id, int limit) {
+        var resource = find(type, id).orElseThrow(ResourceRequestException::notFound);
+        var permissions = access.scope();
+        String joins = switch (type) {
+            case CLUSTER -> "";
+            case NODE -> "";
+            case NAMESPACE -> " join infrastructure_node n on n.id = r.node_id";
+            case POD -> " join infrastructure_namespace ns on ns.id = r.namespace_id"
+                    + " join infrastructure_node n on n.id = ns.node_id";
+        };
+        String scope = !permissions.all() && permissions.clusters().isEmpty() ? " and 1 = 0"
+                : !permissions.all() ? " and " + switch (type) {
+                    case CLUSTER -> "r.id";
+                    case NODE -> "r.cluster_id";
+                    case NAMESPACE -> "n.cluster_id";
+                    case POD -> "n.cluster_id";
+                } + " in (:accessibleClusters)" : "";
+        String sql = "select e.id, e.event_type, e.reason, e.message, e.first_seen_at, e.last_seen_at, e.occurrence_count"
+                + " from infrastructure_kubernetes_event e join " + type.table() + " r on r.id = e.resource_id" + joins
+                + " where e.resource_type = :type and e.resource_id = :id" + scope
+                + " order by e.last_seen_at desc, e.id desc limit :limit";
+        var query = entityManager.createNativeQuery(sql).setParameter("type", type.name()).setParameter("id", id)
+                .setParameter("limit", limit).setHint("jakarta.persistence.query.timeout", timeoutMillis);
+        if (!permissions.all() && !permissions.clusters().isEmpty()) {
+            query.setParameter("accessibleClusters", permissions.clusters());
+        }
+        @SuppressWarnings("unchecked") List<Object[]> rows = query.getResultList();
+        return rows.stream().map(row -> Map.<String, Object>of("id", row[0], "type", row[1], "reason", row[2],
+                "message", row[3], "firstSeenAt", row[4], "lastSeenAt", row[5], "occurrenceCount", row[6])).toList();
     }
 
     private Object[] podCounts(String scope, long id) {

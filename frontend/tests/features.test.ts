@@ -2,12 +2,26 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import ScopeFilters from '../src/components/ScopeFilters.vue'
 import ResourceEvents from '../src/components/ResourceEvents.vue'
+import KubernetesEvents from '../src/components/KubernetesEvents.vue'
 import OperationsDashboard from '../src/components/OperationsDashboard.vue'
 import { api } from '../src/api'
 import { page, resource } from './fixtures'
 const wrappers: ReturnType<typeof mount>[] = []
 afterEach(() => { wrappers.splice(0).forEach(wrapper => wrapper.unmount()) })
 beforeEach(() => { vi.spyOn(api, 'alerts').mockResolvedValue({ available: false, source: 'Prometheus', fetchedAt: '', rules: [], message: '경보 미설정' }) })
+it('displays a legacy event placeholder without a fixture banner and preserves other messages', async () => {
+  vi.spyOn(api, 'kubernetesEvents').mockResolvedValue([
+    { id: 1, type: 'WARNING', reason: 'ResourceDegraded', message: 'Mock resource is in a non-normal state.',
+      firstSeenAt: '2026-10-18T00:00:00Z', lastSeenAt: '2026-10-18T00:00:00Z', occurrenceCount: 1 },
+    { id: 2, type: 'WARNING', reason: 'BackOff', message: 'Container restart condition detected.',
+      firstSeenAt: '2026-10-18T00:00:00Z', lastSeenAt: '2026-10-18T00:00:00Z', occurrenceCount: 2 },
+  ])
+  const wrapper = mount(KubernetesEvents, { props: { resource: resource() } }); wrappers.push(wrapper)
+  await flushPromises()
+  expect(wrapper.text()).toContain('리소스가 비정상 상태입니다.')
+  expect(wrapper.text()).not.toContain('Mock')
+  expect(wrapper.text()).toContain('Container restart condition detected.')
+})
 it('loads scope choices lazily and paginates namespaces without loading all rows', async () => {
   const request=vi.spyOn(api,'list').mockResolvedValueOnce(page([{ resource: resource(2,'CLUSTER'), path: [] }]))
     .mockResolvedValueOnce(page([{ resource: resource(101,'NAMESPACE'), path: [] }],'next'))
@@ -30,6 +44,16 @@ it('renders history and retention with safe attribute text', async () => {
   vi.spyOn(api,'events').mockResolvedValue({items:[{id:1,occurredAt:'2026-10-14T00:00:00Z',previousStatus:'NORMAL',nextStatus:'ERROR',source:'MOCK_SIMULATOR',beforeAttributes:{restartCount:1},afterAttributes:{restartCount:2}}],nextBeforeId:null,hasMore:false,retentionHours:24,maximumEvents:20000})
   const wrapper=mount(ResourceEvents,{props:{resource:resource()}}); wrappers.push(wrapper); await flushPromises()
   expect(wrapper.text()).toContain('정상 → 오류'); expect(wrapper.text()).toContain('1 → 2'); expect(wrapper.text()).toContain('20,000')
+})
+it('renders current event details without a data-origin banner', async () => {
+  const request = vi.spyOn(api, 'kubernetesEvents').mockResolvedValue([{ id: 1, type: 'WARNING', reason: 'BackOff',
+    message: 'Container restart condition detected.', firstSeenAt: '2026-10-18T00:00:00Z',
+    lastSeenAt: '2026-10-18T00:01:00Z', occurrenceCount: 2 }])
+  const wrapper = mount(KubernetesEvents, { props: { resource: resource(25) } }); wrappers.push(wrapper); await flushPromises()
+  expect(request).toHaveBeenCalledOnce()
+  expect(wrapper.text()).toContain('BackOff')
+  expect(wrapper.text()).not.toMatch(/생성한 이벤트|Mock|실제 Kubernetes API/)
+  expect(wrapper.text()).toContain('2회')
 })
 it('uses Prometheus data and does not substitute missing values with zero', async () => {
   vi.spyOn(api,'operations').mockResolvedValue({available:true,source:'Prometheus',fetchedAt:'2026-10-14T00:00:00Z',values:{up:1,heap:1048576,apiP95:null},series:{},message:''})

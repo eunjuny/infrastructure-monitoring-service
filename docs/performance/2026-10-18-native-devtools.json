@@ -1,0 +1,113 @@
+{
+  "captureDate": "2026-10-18",
+  "browser": "Chrome 155.0.8059.80",
+  "mode": "native DevTools Performance",
+  "cpuThrottle": 4,
+  "cacheDisabled": true,
+  "networkThrottle": "none",
+  "viewport": "1080x1769",
+  "pods": 150000,
+  "primary": [
+    {
+      "file": "02-tree-expand-cold.jpg",
+      "metric": "expandCold",
+      "durationMs": 278.72,
+      "targetMs": 100,
+      "count": 1,
+      "withinTarget": false,
+      "caveat": "Accessibility tree observation overlapped; measurement interference needs isolation"
+    },
+    {
+      "file": "01-first-cluster-list.jpg",
+      "metric": "callbackReady",
+      "durationMs": 658.1,
+      "targetMs": 500,
+      "count": 1,
+      "withinTarget": false
+    },
+    {
+      "file": "02-tree-expand.jpg",
+      "metric": "expandWarm",
+      "durationMs": 48.4,
+      "targetMs": 100,
+      "count": 1,
+      "withinTarget": true
+    },
+    {
+      "file": "03-tree-collapse.jpg",
+      "metric": "collapse",
+      "durationMs": 37.98,
+      "targetMs": 100,
+      "count": 1,
+      "withinTarget": true
+    },
+    {
+      "file": "04-name-search.jpg",
+      "metric": "search",
+      "durationMs": 142.32,
+      "targetMs": 300,
+      "count": 1,
+      "withinTarget": true
+    },
+    {
+      "file": "05-status-filter.jpg",
+      "metric": "filter",
+      "durationMs": 138.65,
+      "targetMs": 200,
+      "count": 1,
+      "withinTarget": true
+    },
+    {
+      "file": "06-manual-refresh.jpg",
+      "metric": "refreshReadOnly",
+      "durationMs": 57.96,
+      "targetMs": 200,
+      "count": 1,
+      "withinTarget": true
+    },
+    {
+      "file": "07-changed-refresh.jpg",
+      "metric": "refreshChanged",
+      "durationMs": 122.1,
+      "targetMs": 200,
+      "count": 1,
+      "withinTarget": true
+    },
+    {
+      "file": "08-automatic-changed-refresh.jpg",
+      "metric": "pollChanged",
+      "durationMs": 75.9,
+      "targetMs": 200,
+      "count": 1,
+      "withinTarget": true
+    }
+  ],
+  "additionalStartup": {
+    "viewport": "1440x1000",
+    "durationMs": 619.13,
+    "targetMs": 500,
+    "file": "01-first-cluster-list-1440.jpg"
+  },
+  "scroll": {
+    "nativeWheelDurationMs": 19202,
+    "performanceCapture": "09-continuous-scroll-performance.jpg",
+    "fpsMeterCapture": "09-native-fps-meter.jpg",
+    "fpsMeterSnapshot": 91.2,
+    "sustained55FPSVerified": false,
+    "fpsMeterTrigger": "requestAnimationFrame-driven scroll, separate from native wheel trace"
+  },
+  "memory": {
+    "tabMB": 90.8,
+    "file": "10-chrome-task-memory.jpg",
+    "devToolsOpen": true
+  },
+  "fixtureRestored": true,
+  "allTargetsPassed": false,
+  "limitations": [
+    "One selected capture per interaction, not percentile statistics",
+    "First-screen native recordings exceed 500ms; callback excludes prior SSO redirect",
+    "Two RAFs indicate rendering opportunity, not optical display measurement",
+    "FPS snapshot is not proof of minimum sustained FPS",
+    "Measurement helper only, not production instrumentation"
+  ]
+}

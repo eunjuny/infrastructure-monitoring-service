@@ -5,6 +5,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import java.util.List;
+import java.util.Map;
 
 import static dev.infrastructure.monitoring.resource.ResourceResponses.*;
 
@@ -41,6 +43,12 @@ public class ResourceController {
     @GetMapping("/{type}/{id}")
     public Detail detail(@PathVariable String type, @PathVariable long id) {
         return service.detailWithDiagnostics(ResourceType.parse(type), id);
+    }
+
+    @GetMapping("/{type}/{id}/kubernetes-events")
+    public List<Map<String, Object>> kubernetesEvents(@PathVariable String type, @PathVariable long id,
+                                                       @RequestParam(defaultValue = "20") int limit) {
+        return service.kubernetesEvents(ResourceType.parse(type), id, limit);
     }
 
     @GetMapping("/{type}/{id}/children")
