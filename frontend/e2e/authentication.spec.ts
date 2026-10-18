@@ -45,6 +45,20 @@ test('administrator sees all resources and operations', async ({ page }) => {
   await expect(page.locator('.alert-rules > li')).toHaveCount(3)
 })
 
+test('foreground resource totals are queried again on the slower aggregate interval', async ({ page }) => {
+  test.setTimeout(90000)
+  const isSummary = (response: import('@playwright/test').Response) =>
+    new URL(response.url()).pathname === '/api/resources/summary' && response.status() === 200
+  const initial = page.waitForResponse(isSummary)
+  await login(page, 'admin')
+  expect(await (await initial).json()).toEqual({ clusters: 20, nodes: 200, namespaces: 2000, pods: 150000 })
+  await expect(page.locator('.cards')).toContainText('150,000')
+  const next = await page.waitForResponse(isSummary, { timeout: 75000 })
+  expect(await next.json()).toEqual({ clusters: 20, nodes: 200, namespaces: 2000, pods: 150000 })
+  await expect(page.locator('.cards')).toContainText('150,000')
+  await expect(page.locator('.resource-row').first()).toContainText('cluster-01')
+})
+
 for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844 }]) {
   test(`resource diagnostics show real scoped data at ${viewport.width}px`, async ({ page }) => {
     await page.setViewportSize(viewport)
@@ -82,6 +96,19 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
       }
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
     }
+    // A newly covered GPU node, not only the original every-tenth-node fixture.
+    await page.getByRole('button', { name: 'Node 전체 목록 보기', exact: true }).click()
+    const gpuRow = page.locator('.resource-row').filter({ hasText: 'node-002' })
+    await expect(gpuRow).toBeVisible()
+    const receivedGpu = page.waitForResponse(response => new URL(response.url()).pathname === '/api/resources/NODE/2'
+      && response.status() === 200)
+    await gpuRow.click()
+    const gpuDetail = await (await receivedGpu).json()
+    expect(gpuDetail.attributes.gpuDevices).toHaveLength(2)
+    const gpuSection = page.locator('[aria-label="GPU 장치"]')
+    await expect(gpuSection.locator('.diagnostic-device')).toHaveCount(2)
+    await expect(gpuSection).toContainText(gpuDetail.attributes.gpuDevices[0].model)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   })
 }
 

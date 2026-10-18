@@ -54,7 +54,10 @@ class SchemaIntegrationTest {
         seed.execute(dataSource);
         assertExpectedCounts();
         assertThat(jdbc.queryForObject("select count(*) from infrastructure_pod_container", Long.class)).isGreaterThan(150000L);
-        assertThat(jdbc.queryForObject("select count(*) from infrastructure_node_gpu", Long.class)).isEqualTo(40L);
+        assertThat(jdbc.queryForObject("select count(*) from infrastructure_node_gpu", Long.class)).isEqualTo(200L);
+        assertThat(jdbc.queryForObject("select count(distinct node_id) from infrastructure_node_gpu", Long.class)).isEqualTo(100L);
+        assertThat(jdbc.queryForObject("select count(*) from (select node_id from infrastructure_node_gpu group by node_id having count(*) <> 2) invalid", Long.class)).isZero();
+        var gpuSnapshot = jdbc.queryForMap("select * from infrastructure_node_gpu where node_id=10 and device_name='gpu-1'");
         assertThat(jdbc.queryForObject("select count(*) from infrastructure_kubernetes_event", Long.class)).isGreaterThan(0L);
         assertThat(jdbc.queryForObject("""
                 select count(*) from (
@@ -89,6 +92,9 @@ class SchemaIntegrationTest {
                 """);
         seed.execute(dataSource);
         assertExpectedCounts();
+        assertThat(jdbc.queryForObject("select count(*) from infrastructure_node_gpu", Long.class)).isEqualTo(200L);
+        assertThat(jdbc.queryForMap("select * from infrastructure_node_gpu where node_id=10 and device_name='gpu-1'"))
+                .isEqualTo(gpuSnapshot);
         assertThat(jdbc.queryForObject("select count(*) from infrastructure_pod_container", Long.class)).isGreaterThan(150000L);
         assertThat(jdbc.queryForMap("""
                 select count(*) as rows, sum(id) as ids, sum(restart_count) as restarts,

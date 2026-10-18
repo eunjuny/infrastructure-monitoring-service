@@ -73,7 +73,7 @@ SELECT n.id, 'gpu-' || device_number,
        mod(n.id + device_number, 5), n.updated_at
 FROM infrastructure_node n
 CROSS JOIN generate_series(1, 2) AS device_number
-WHERE n.id % 10 = 0
+WHERE n.id % 2 = 0
 ON CONFLICT (node_id, device_name) DO NOTHING;
 
 INSERT INTO infrastructure_kubernetes_event

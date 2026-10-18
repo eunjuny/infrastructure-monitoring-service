@@ -68,6 +68,8 @@ class ResourceDiagnosticsIntegrationTest {
         assertEquals(24, service.detailWithDiagnostics(ResourceType.NODE, 2).attributes().get("cpuCapacityCores"));
         var node = service.detailWithDiagnostics(ResourceType.NODE, 10).attributes();
         assertEquals(2, ((java.util.List<?>) node.get("gpuDevices")).size());
+        assertEquals(2, ((java.util.List<?>) service.detailWithDiagnostics(ResourceType.NODE, 2).attributes().get("gpuDevices")).size());
+        assertTrue(((java.util.List<?>) service.detailWithDiagnostics(ResourceType.NODE, 1).attributes().get("gpuDevices")).isEmpty());
         assertTrue(((Number) node.get("cpuUsageCores")).doubleValue() >= 0);
         assertTrue(((Number) node.get("cpuAllocatableCores")).doubleValue() > 0);
         jdbc.update("update infrastructure_pod set status='ERROR' where id=2");
@@ -92,7 +94,38 @@ class ResourceDiagnosticsIntegrationTest {
         assertThrows(ResourceRequestException.class, () -> service.kubernetesEvents(ResourceType.POD, 4, 21));
         assertThrows(ResourceRequestException.class, () -> service.kubernetesEvents(ResourceType.POD, 999999, 20));
         assertTrue(jdbc.queryForObject("select count(*) from infrastructure_pod_container", Long.class) > 150000);
-        assertEquals(40L, jdbc.queryForObject("select count(*) from infrastructure_node_gpu", Long.class));
+        assertEquals(200L, jdbc.queryForObject("select count(*) from infrastructure_node_gpu", Long.class));
+    }
+
+    @Test void v6ExpandsGpuCoverageAndPreservesExistingMeasurements() throws Exception {
+        try (var connection = DriverManager.getConnection(DB.getJdbcUrl(), DB.getUsername(), DB.getPassword());
+             var statement = connection.createStatement()) {
+            statement.execute("create database gpu_coverage_upgrade");
+        }
+        String url = DB.getJdbcUrl().replace("/" + DB.getDatabaseName(), "/gpu_coverage_upgrade");
+        Flyway.configure().dataSource(url, DB.getUsername(), DB.getPassword()).target("5").load().migrate();
+        var upgrade = new JdbcTemplate(new org.springframework.jdbc.datasource.DriverManagerDataSource(
+                url, DB.getUsername(), DB.getPassword()));
+        upgrade.update("insert into infrastructure_cluster values(1,'gpu-cluster','NORMAL',now())");
+        upgrade.update("insert into infrastructure_node(id,cluster_id,name,status,updated_at,cpu_usage,memory_usage)"
+                + " select n,1,'node-'||n,'WARNING','2026-01-01T00:00:00Z'::timestamptz,25,30"
+                + " from generate_series(1,200) n");
+        upgrade.update("insert into infrastructure_node_gpu(node_id,device_name,model,memory_mib,"
+                + "utilization_percent,temperature_celsius,allocated_pods,updated_at)"
+                + " select n.id,'gpu-'||d,'existing-device',40960,12,40,1,n.updated_at"
+                + " from infrastructure_node n cross join generate_series(1,2) d where n.id%10=0");
+        var existing = upgrade.queryForMap("select * from infrastructure_node_gpu where node_id=10 and device_name='gpu-1'");
+        var node = upgrade.queryForMap("select * from infrastructure_node where id=2");
+        assertEquals(40L, upgrade.queryForObject("select count(*) from infrastructure_node_gpu", Long.class));
+        var flyway = Flyway.configure().dataSource(url, DB.getUsername(), DB.getPassword()).load();
+        assertEquals(1, flyway.migrate().migrationsExecuted);
+        assertEquals(200L, upgrade.queryForObject("select count(*) from infrastructure_node_gpu", Long.class));
+        assertEquals(100L, upgrade.queryForObject("select count(distinct node_id) from infrastructure_node_gpu", Long.class));
+        assertEquals(0L, upgrade.queryForObject("select count(*) from infrastructure_node_gpu where node_id%2<>0", Long.class));
+        assertEquals(existing, upgrade.queryForMap("select * from infrastructure_node_gpu where node_id=10 and device_name='gpu-1'"));
+        assertEquals(node, upgrade.queryForMap("select * from infrastructure_node where id=2"));
+        assertEquals(0, flyway.migrate().migrationsExecuted);
+        assertEquals(200L, upgrade.queryForObject("select count(*) from infrastructure_node_gpu", Long.class));
     }
 
     @Test void missingResourceDoesNotBecomeAnEmptySuccessfulAggregate() {

@@ -15,6 +15,8 @@ const emit = defineEmits<{ initialListSettled: [] }>()
 const ResourceDetail = defineAsyncComponent(() => import('./components/ResourceDetail.vue'))
 const OperationsDashboard = defineAsyncComponent(() => import('./components/OperationsDashboard.vue'))
 const summary = shallowRef<Summary | null>(null), summaryError = ref('')
+const summaryBusy = ref(false)
+const summaryInterval = 60000
 const selected = shallowRef<Reference | null>(null), detail = shallowRef<Detail | null>(null)
 const detailBusy = ref(false), detailError = ref(''), refreshing = ref(false), refreshedAt = ref('')
 const query = ref(''), type = ref<ResourceType | ''>('CLUSTER'), status = ref<ResourceStatus | ''>('')
@@ -47,6 +49,7 @@ const currentScopeLabel = computed(() => scopeNamespace.value?.name || scopeClus
 let timer: ReturnType<typeof setTimeout> | undefined
 let summaryStartTimer: ReturnType<typeof setTimeout> | undefined
 let initialSummaryRequested = false
+let summaryCompletedAt: number | undefined
 let cancelInitialTiming: (() => void) | undefined
 let detailController: AbortController | undefined, summaryController: AbortController | undefined
 let detailRevision = 0, appliedScope = ''
@@ -120,9 +123,15 @@ async function nextPage() {
 }
 async function loadSummary() {
   summaryController?.abort(); summaryController = new AbortController()
-  const signal = summaryController.signal; summaryError.value = ''
+  const signal = summaryController.signal; summaryError.value = ''; summaryBusy.value = true
   try { const value = await api.summary(signal); if (!signal.aborted) summary.value = value }
   catch (cause) { if (!signal.aborted) summaryError.value = errorMessage(cause) }
+  finally {
+    if (summaryController?.signal === signal) {
+      summaryBusy.value = false
+      if (!signal.aborted) summaryCompletedAt = performance.now()
+    }
+  }
 }
 async function refreshDetail() {
   if (!selected.value) return
@@ -137,21 +146,21 @@ async function refreshCurrent(automatic = false): Promise<boolean> {
   if (refreshing.value) return false
   clearTimeout(timer); timer = undefined; refreshing.value = true
   const sameScope = appliedScope === JSON.stringify(scope())
-  const retrySummary = !automatic && Boolean(summaryError.value)
+  const refreshSummary = !summaryBusy.value && summaryCompletedAt !== undefined
+    && (performance.now() - summaryCompletedAt >= summaryInterval || !automatic && Boolean(summaryError.value))
   try {
-    // Resource counts are structural fixture data and status changes never alter them.
-    // Keep the summary request out of the manual refresh path to avoid re-counting 150k rows.
-    await Promise.all([sameScope ? list.refresh() : applyFilters(), retrySummary ? loadSummary() : undefined,
+    // Share one foreground scheduler, but recount only when the slower summary interval is due.
+    await Promise.all([sameScope ? list.refresh() : applyFilters(), refreshSummary ? loadSummary() : undefined,
       tree.value?.refresh(), refreshDetail()])
     refreshedAt.value = shortTimestamp(new Date().toISOString())
-    return !list.error.value && !detailError.value && !tree.value?.hasError() && (!retrySummary || !summaryError.value)
+    return !list.error.value && !detailError.value && !tree.value?.hasError() && (!refreshSummary || !summaryError.value)
   } finally { refreshing.value = false }
 }
 function cancelPollingRequests() {
-  list.stop(); tree.value?.stop(); detailController?.abort(); detailRevision++; detailBusy.value = false
+  list.stop(); tree.value?.stop(); detailController?.abort(); summaryController?.abort(); detailRevision++; detailBusy.value = false
 }
 const polling = usePolling(() => refreshCurrent(true),
-  () => screen.value === 'resources' && !refreshing.value && !list.busy.value && !detailBusy.value && !tree.value?.isBusy()
+  () => screen.value === 'resources' && !refreshing.value && !summaryBusy.value && !list.busy.value && !detailBusy.value && !tree.value?.isBusy()
     && timer === undefined && appliedScope === JSON.stringify(scope()), cancelPollingRequests)
 async function reveal() {
   if (!detail.value) return
