@@ -124,7 +124,7 @@ python3 scripts/test-auth.py
 PERF_LABEL=auth-admin-local PERF_REPETITIONS=20 python3 scripts/test-auth.py --performance
 ```
 
-마지막 명령은 ADMIN의 실제 PKCE 로그인·SSO 재진입·탐색을 읽기 전용으로 측정합니다. 매 실행에 서로 다른 `PERF_LABEL`을 지정합니다. 실패·목표 초과를 성공으로 바꾸지 않으며 [인증 성능 기준](AUTHENTICATION_PERFORMANCE.md)을 따릅니다.
+마지막 명령은 ADMIN의 실제 PKCE 로그인·SSO 재진입·탐색을 읽기 전용으로 측정합니다. 매 실행에 서로 다른 `PERF_LABEL`을 지정합니다. 실패·목표 초과를 성공으로 바꾸지 않으며 [인증 성능 기준](PERFORMANCE.md)을 따릅니다.
 
 설치된 Chrome으로 실제 변경 반영·폴링·스크롤까지 확인하려면 `PERF_BROWSER=chrome PERF_FULL=1 PERF_LABEL=auth-full-local PERF_REPETITIONS=20 python3 scripts/test-auth.py --performance`를 사용합니다. FULL은 과제 인증 DB의 Pod 1을 잠시 변경하고 동시 수정이 없을 때만 복원합니다. 실사용 DB에는 실행하지 않으며 [상세 프로토콜](PERFORMANCE.md)을 먼저 확인합니다. 기본 읽기 전용 측정과 구분합니다.
 

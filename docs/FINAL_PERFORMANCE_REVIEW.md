@@ -58,4 +58,4 @@ CDP/RAF 보조 계측, native FPS 미터 관측, 작업 관리자 메모리는 �
 PERF_BROWSER=chrome PERF_FULL=1 PERF_REPETITIONS=20 PERF_LABEL=<새-이름> python3 scripts/test-auth.py --performance
 ```
 
-[전체 표본·조건·복원 JSON](performance/2026-10-18-reboot-final.json), [Chrome Performance 원본](CHROME_PERFORMANCE_CAPTURE.md), [측정 기준](PERFORMANCE.md), [누적 작업 이력](WORK_HISTORY.md)을 함께 관리합니다. 원본 로컬 보고서는 Git 제외 경로에 보관합니다. CI 전체 처리량·동시 사용자 부하와 단일 사용자의 화면 지연 검증은 구분합니다.
+[전체 표본·조건·복원 JSON](performance/2026-10-18-reboot-final.json), [Chrome Performance 원본](CHROME_PERFORMANCE_CAPTURE.md), [측정 기준](PERFORMANCE.md)을 함께 관리합니다. 원본 로컬 보고서는 Git 제외 경로에 보관합니다. CI 전체 처리량·동시 사용자 부하와 단일 사용자의 화면 지연 검증은 구분합니다.

@@ -64,10 +64,4 @@ Flyway V4는 기본 Node 용량과 Pod 대표 메타데이터를 추가했습니
 
 ## 검증 범위
 
-단위 시나리오, 실제 PostgreSQL V4→V5 보존·15만 seed·컨테이너/GPU 행 수·상태 전환과 이벤트 upsert/정리·JPA scalar SQL 예산·실제 JWT/JWKS 교차 권한 차단·상세/이벤트 화면을 검증합니다. 성능 반복과 실제 Kubernetes/GPU collector 연결 여부는 별도입니다.
-
-2026-10-18 PostgreSQL/Testcontainers 통합 테스트 39개(진단7·스키마1·인증14·Mock 상태7·JPA 조회10), 프론트 99개, TypeScript 검사, 프로덕션 빌드와 `scripts/check.sh fast` 73개를 통과했습니다. 1440px/390px에서 네 유형의 API 응답과 화면 값을 비교했고 가로 넘침 없이 표시했습니다. 실제 실행 환경의 V5 배포 검증 상태는 WH-047에 따로 기록하며, 테스트 성공을 실제 서비스 반영으로 혼동하지 않습니다.
-
-WH-047 통합 과정에서 인증 평가 DB에 V5를 실제 적용했습니다. Pod 150,000·컨테이너 200,000·GPU 40·현재 이벤트 118,104행, DB/backend/alert-receiver health와 웹·OIDC 설정·Prometheus·Alertmanager ready 응답을 확인했고 Keycloak E2E 14개도 통과했습니다. 데이터베이스는 비공개 dump 백업 후 이행했으며 기존 계정/데이터를 유지했습니다.
-
-실행 중 DB의 단일 EXPLAIN ANALYZE 프로브에서 Cluster의 Pod 집계11.367ms(기존 Node 부모·Pod 부모/상태 인덱스), Namespace 집계0.172ms(Pod 부모/상태 인덱스)를 확인했습니다. 현재 로컬 DB의 한 표본이며 HTTP/CPU4x 브라우저 지연·동시 부하·다른 실행 모드·전체 Jenkins 합격을 뜻하지 않습니다. [정리된 검증 근거](verification/2026-10-18-resource-diagnostics.json)를 참고합니다.
+Testcontainers는15만 Pod의 집계·권한·SQL 예산·스키마/seed 멱등성과 V5→V6의 기존 장치 보존을 검증합니다. 실제 인증 브라우저에서는1440px/390px에서 상세 API와 화면을 비교하고 node-002의 GPU2개 표시를 확인합니다. 현재 서버143개·프론트113개·Keycloak15개 결과의 적용 범위는 [기준 문서](PROJECT_GUIDE.md)에 관리합니다.

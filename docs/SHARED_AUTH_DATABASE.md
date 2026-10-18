@@ -71,5 +71,3 @@ python3 scripts/test-auth.py
 ```
 
 실제 PostgreSQL 검사는 별도 이름·tmpfs 서버에서 새 초기화, 재실행의 데이터 보존, 두 계정의 TCP 비밀번호 인증, 상대/유지관리 DB 접속 거부, DB/역할 생성·슈퍼유저 승격 거부를 검증한 뒤 그 서버만 제거합니다. 실제 이행에서는 전체 테이블 일치와 브라우저 로그인·권한을 확인합니다. 새 전체 Jenkins/성능 측정과는 별개입니다.
-
-2026-10-18 실제 이행에서 서비스 public 테이블 6개·Keycloak 101개의 내용 일치를 확인했습니다. 기존 15만 Pod와 사용자 ID/암호/권한/서명 키를 보존했고, 로컬 실제 Keycloak 10개와 새 단일 서버/tmpfs 인증 환경의 실제 Keycloak 10개를 각각 통과했습니다(skip/unexpected/flaky 0). 새 환경은 기존 앱 이미지를 재사용해 DB 초기화 경로를 검증했으며 전체 Jenkins/새 이미지 빌드로 설명하지 않습니다. 이전 identity 컨테이너는 검증 후 제거했고 원본 볼륨 두 개와 private dump는 보관합니다. [실행 요약](verification/2026-10-18-shared-auth-database.json), WH-037을 참고합니다.

@@ -1,6 +1,6 @@
 # 리소스 API 계약
 
-실제 PostgreSQL 17의 Testcontainers 및 Chromium E2E로 조회 계약을 검증했습니다. 아래 예시는 응답 형식 설명이며 성능 수치가 아닙니다. [실행 근거](STAGE4_REPORT.md)를 참고합니다.
+실제 PostgreSQL 17의 Testcontainers 및 Chromium E2E로 조회 계약을 검증했습니다. 아래 예시는 응답 형식 설명이며 성능 수치가 아닙니다.
 
 ## 엔드포인트
 

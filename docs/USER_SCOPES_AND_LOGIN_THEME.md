@@ -59,5 +59,3 @@ python3 scripts/test-auth.py
 - Vitest 83개·vue-tsc·Vite build 통과. 실제 호스트 API+별도 프로덕션 preview의 읽기 전용 Chromium 10개 통과. DB를 직접 수정하는 폴링 E2E는 제외했습니다.
 - 실제 Keycloak 브라우저 검증은 관리자/A/B 5개에 브랜드/한국어/키보드/1440px·320px 두 화면과 오류 후 재제출을 더해 8개입니다. 계정·토큰 trace를 저장하지 않고 캡처는 입력값 없는 로그인 폼만 저장합니다.
 - 전체 Jenkins/새 앱 이미지·CI Keycloak 재생성·성능/FPS/작업관리자 메모리는 이번 범위에서 재실행하지 않았습니다. Testcontainers 공개 이미지용 클라이언트 분리로 개인 Docker 설정은 유지했습니다.
-
-실제 최종 실행 수치·실패/정리와 Git 상태는 [WH-035](WORK_HISTORY.md), 계정 정책은 [인증 문서](AUTHENTICATION.md), 코드/계측과 학습 설명은 [전체 구성](PROJECT_ARCHITECTURE.md), [학습 목록](STUDY_QUESTIONS.md)을 참고합니다.

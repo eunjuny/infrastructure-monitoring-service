@@ -52,8 +52,6 @@ Alertmanager는 별도 볼륨과 24시간 알림 로그/해소 상태 retention�
 
 ## 실행과 검증
 
-2026-10-15 Jenkins 빌드 10에서 9개 시계열 시나리오·설정 검사·실제 장애/복구 검증을 통과했습니다. 검증 시작 후 63.24초 firing, 68.63초 독립 수신, 84.26초 resolved 수신과 10만 Pod 보존을 확인했습니다. 준비 확인·수집/평가/전달 간격을 포함하는 한 번의 실행 기록이며 SLA는 아닙니다. 서버 102개·프론트 77개·기본 브라우저 11개·실제 Keycloak 5개도 통과했습니다. [실행 요약](verification/2026-10-15-auth-ci-alerting.json)을 참고합니다.
-
 ```bash
 # 규칙 정적 검사·시계열 단위 테스트·Alertmanager 설정 검사
 bash scripts/test-alert-rules.sh

@@ -50,4 +50,4 @@ FPS 미터는15초 스크롤 중 세 시점 관측이고 탭 메모리는 별도
 4. 녹화 종료 후 measure를 Find로 선택하고 drawer를 닫아 Summary Duration이 보이는 원본을 저장합니다.
 5. 토큰·인증 코드·헤더가 들어갈 수 있는 raw trace/HAR는 공개하지 않으며 측정용 창/도구를 정리합니다.
 
-[측정 프로토콜](PERFORMANCE.md), [최종 반복 결과](FINAL_PERFORMANCE_REVIEW.md), [작업 이력](WORK_HISTORY.md)을 참고합니다.
+[측정 프로토콜](PERFORMANCE.md), [최종 반복 결과](FINAL_PERFORMANCE_REVIEW.md)를 참고합니다.

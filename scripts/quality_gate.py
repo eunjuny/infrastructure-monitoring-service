@@ -17,7 +17,7 @@ TEXT_NAMES = {"AGENTS.md", "README.md", "Jenkinsfile", "Dockerfile", ".gitignore
 GRADLE_VERSION = "8.14.3"
 GRADLE_ZIP_SHA256 = "bd71102213493060956ec229d946beee57158dbd89d0e62b91bca0fa2c5f3531"
 GRADLE_WRAPPER_SHA256 = "7d3a4ac4de1c32b59bc6a4eb8ecb8e612ccd0cf1ae1e99f66902da64df296172"
-REQUIRED = {"AGENTS.md", "README.md", "docs/PROJECT_GUIDE.md", "docs/WORK_HISTORY.md",
+REQUIRED = {"AGENTS.md", "README.md", "docs/PROJECT_GUIDE.md",
             "docs/DEVELOPMENT_GUIDE.md", "docs/QUALITY_GATES.md"}
 DOCUMENT_IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png"}
 MAX_DOCUMENT_IMAGE_BYTES = 5 * 1024 * 1024
@@ -53,6 +53,8 @@ def check_files(files: dict[str, str], image_paths: frozenset[str] = frozenset()
         if path.endswith(".md"):
             # Inline local links only. No network, anchor or reference-link validation.
             text = re.sub(r"```[\s\S]*?```", "", source)
+            if re.search(r"\]\([^\)\n]*$", text, re.M):
+                reject("unterminated-document-link", path)
             for target in re.findall(r"\]\(([^)\s]+)\)", text):
                 target = target.strip("<>")
                 if target.startswith("#") or re.match(r"[A-Za-z][A-Za-z0-9+.-]*:", target):

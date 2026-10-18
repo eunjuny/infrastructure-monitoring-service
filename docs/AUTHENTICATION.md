@@ -37,7 +37,7 @@ Prometheus → 인증 환경의 backend만 수집 → ADMIN 운영 관측
 
 ## 서버의 접근 제어
 
-2026-10-16 보완: 유효한 서명이어도 만료 시각 `exp`가 없거나 groups/해당 API client roles가 문자열 배열이 아니면 401로 차단합니다. 배열은 최대 1,000개이며 `resource_access`/client 구조도 검사합니다. 정상 역할 없음의 403과 미배정 VIEWER의 0건 정책은 유지합니다. 설정이 잘못된 발급자의 토큰도 무조건 신뢰하지 않기 위한 경계이며 서명 없는 위조 토큰의 접근 허용을 뜻하지 않습니다. [재현·근거·검증 범위](REQUIREMENTS_AND_HARDENING_REVIEW.md)를 참고합니다.
+2026-10-16 보완: 유효한 서명이어도 만료 시각 `exp`가 없거나 groups/해당 API client roles가 문자열 배열이 아니면 401로 차단합니다. 배열은 최대 1,000개이며 `resource_access`/client 구조도 검사합니다. 정상 역할 없음의 403과 미배정 VIEWER의 0건 정책은 유지합니다. 설정이 잘못된 발급자의 토큰도 무조건 신뢰하지 않기 위한 경계이며 서명 없는 위조 토큰의 접근 허용을 뜻하지 않습니다. [재현·근거·검증 범위](QUALITY_GATES.md)를 참고합니다.
 
 | 요청 | 서버 처리 |
 |---|---|
@@ -84,7 +84,7 @@ python3 scripts/test-auth.py
 
 평가용 새 설치는 `admin`, `user1`, `user2`를 초기 데이터로 등록하고 세 계정 모두 비밀번호 `1234`를 사용합니다. README의 로그인 정보로 바로 평가할 수 있도록 공개한 테스트 데이터입니다. `--ci`는 매번 서로 다른 무작위 임시 계정 비밀번호를 사용합니다. DB·Keycloak 초기화 관리자·내부 제어 토큰은 평가 환경에서도 별도 무작위 생성합니다.
 
-전체 초기 설정은 `.local/auth`에 저장하며 디렉터리 0700·파일 0600 권한을 사용합니다. 공개된 평가 계정 외의 비밀값은 소스 ZIP·문서·로그에 포함하지 않습니다. 고정 평가 계정은 루프백으로 제공되는 로컬 환경에서 사용하며 공개 운영 시에는 운영용 계정·비밀번호 정책을 구성해야 합니다. 현재 정책의 적용과 검증은 [작업 이력](WORK_HISTORY.md)의 WH-046에 기록합니다.
+전체 초기 설정은 `.local/auth`에 저장하며 디렉터리 0700·파일 0600 권한을 사용합니다. 공개된 평가 계정 외의 비밀값은 소스 ZIP·문서·로그에 포함하지 않습니다. 고정 평가 계정은 루프백으로 제공되는 로컬 환경에서 사용하며 공개 운영 시에는 운영용 계정·비밀번호 정책을 구성해야 합니다.
 
 기존 비밀 파일이 있으면 값을 재사용합니다. 재실행으로 기존 사용자 비밀번호를 초기화하거나 Realm을 삭제하지 않습니다. 시작 import는 이미 존재하는 Realm을 덮어쓰지 않으므로 이후 권한/계정 변경은 Keycloak 관리 작업으로 수행해야 합니다.
 
@@ -104,18 +104,6 @@ docker compose --env-file .local/auth/compose.env -f compose.auth.yaml stop
 
 ## 검증과 제한
 
-현재 계정/분포/로그인 테마 변경 후 실제 Keycloak 8개를 통과했습니다. ADMIN 전체·user1 100,000/user2 50,000·교차 접근 차단·커서·로그아웃에 브랜드/한국어·1440px/320px·키보드·오류 재제출을 포함합니다. 옛 이름을 자동 재생성하지 않는 오프라인 검사도 추가했습니다. [현재 설계/실행 근거](USER_SCOPES_AND_LOGIN_THEME.md), WH-035를 참고하며 아래 초기 96개/5개와 과거 성능은 도입 당시 기록입니다.
+서버 통합 테스트는 실제 RSA/JWKS·PostgreSQL에서 서명·issuer·audience·만료·sub·역할과 그룹 구조, 권한별 목록/집계·교차 접근·커서 바인딩을 검증합니다. 실제 Keycloak 브라우저 E2E는 세 계정의 PKCE 로그인·전체/제한 조회·운영 메뉴/API 접근·로그아웃·토큰 비영속화를 확인합니다.
 
-후속 작업에서 실제 Keycloak E2E를 전체 CI/Jenkins에 연결했습니다. CI 전용 프로젝트/주소·tmpfs DB·새 임시 계정을 사용하고 사용 중인 로컬 인증 계정은 변경하지 않습니다. `bash scripts/ci-auth.sh`로 인증 단계만 실행합니다. [Keycloak과 인증 CI/배포의 관계·안전한 보고서·정리](AUTHENTICATION_CI.md)를 참고합니다. 새 `/api/operations/alerts`도 ADMIN 경계를 적용합니다. [경보 설계](ALERTING_AND_RECOVERY.md)의 수신기는 신뢰된 내부 네트워크 전용 도구입니다.
-
-- 기본 회귀 87개를 유지하고 실제 RSA/JWKS·Spring Security·PostgreSQL 통합 9개를 추가했습니다. 전체 Gradle 테스트 96개에 실제 PostgreSQL 39개가 포함됩니다.
-- 통합 테스트는 전체/반쪽 집계, 목록·검색·다른 범위의 상세/경로/이력/하위/필터, 커서 계정 바인딩, 권한 미배정, 다른 client 역할, 서명·발급자·audience·만료·sub 검증을 다룹니다.
-- 실제 Keycloak 브라우저 테스트 5개로 관리자/A/B 로그인·PKCE·건수·조회 차단·운영 메뉴/서버 차단·다른 계정 커서·로그아웃·토큰 비영속화를 확인합니다.
-- 인증 테스트는 trace/스크린샷/video/storageState를 저장하지 않고 전용 runner가 비밀번호/JWT/인증 코드 등을 마스킹한 뒤 결과만 출력합니다. 기본 E2E와 별도 `E2E_AUTH` 모드를 사용합니다.
-- 프론트는 401/403 처리·토큰 주입/갱신 실패·취소·시간 제한·로그아웃 상태를 포함해 73개 테스트를 검증했습니다. 기본 환경 실제 API E2E 및 CI 최종 결과는 [작업 이력](WORK_HISTORY.md)에 기록합니다.
-- 첫 인증 통합 테스트의 컨테이너 시작 전 포트 접근 오류는 테스트 생명주기를 수정했습니다. 첫 Keycloak 준비 대기의 연결 종료도 제한된 재시도 대상으로 처리했습니다. 실패를 테스트 제외로 해결하지 않았습니다.
-- 기존 500ms 초기 진입 결과는 인증 추가 전 코드/측정 조건의 기록입니다. 로그인 전체 시간을 포함한 측정이나 이번 인증 화면의 성능 통과를 뜻하지 않습니다. 성능 비교는 비인증/로그인 완료 후/전체 인증 흐름을 구분해야 합니다.
-
-후속 관리자 성능 검증에서는 실제 PKCE 비밀번호 로그인과 SSO 재진입을 각각 20회×2 측정했습니다. CPU 4x·캐시 OFF·실제 10만 Pod의 ADMIN 건수를 매회 확인했고 SSO 재진입 최대 330.03ms, 펼침·검색·필터·읽기 전용 갱신 목표 초과 0을 확인했습니다. 비밀번호 제출 후 로그인 최대 638.02ms는 별도 관측으로 보존합니다. `PERF_LABEL=auth-admin-local python3 scripts/test-auth.py --performance`로 재현하며 새 label을 사용합니다. 실제 Keycloak E2E 5개도 재통과했습니다. [구간별 결과·원본·비밀값 보호·미측정 범위](AUTHENTICATION_PERFORMANCE.md)를 참고합니다. 이 결과는 A/B 성능·동시 부하·자동 갱신 변경값 전파·FPS·탭 메모리의 재검증이 아닙니다.
-
-참고: [Keycloak JS](https://www.keycloak.org/securing-apps/javascript-adapter), [공식 배포](https://www.keycloak.org/downloads), [Spring Security JWT](https://docs.spring.io/spring-security/reference/6.5/servlet/oauth2/resource-server/jwt.html), [로컬/운영 주소](https://www.keycloak.org/server/hostname).
+인증 CI는 별도 Keycloak·tmpfs DB·임시 계정을 사용하며 로컬 계정을 바꾸지 않습니다. 실패 보고서에는 인증 코드·JWT·비밀번호·HAR·storageState를 저장하지 않습니다. [인증 CI](AUTHENTICATION_CI.md), [계정·테마](USER_SCOPES_AND_LOGIN_THEME.md), [성능 조건](PERFORMANCE.md)을 참고합니다.

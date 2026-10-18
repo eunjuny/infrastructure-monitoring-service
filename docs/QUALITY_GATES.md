@@ -1,97 +1,47 @@
-# 품질 게이트와 개발 하네스
+# 품질 게이트
 
-## Chrome 원본 증거 경계
-
-CPU4×·캐시 OFF의 실제 Performance 화면과 이벤트 Duration을 목표별로 보관합니다. 통계에서 만든 PNG는 DevTools 원본이 아닙니다. headless 반복 통과와 GUI 단일 기록, 캐시 재펼침과 최초 네트워크 펼침을 구분합니다. FPS 미터 한 장면으로 전 구간 유지 목표를 통과시키지 않습니다. 현재 성공 실행의 통계는 [최종 결과](FINAL_PERFORMANCE_REVIEW.md)와 WH-051을 기준으로 합니다. 과거 실행은 작업 이력·archive로 보존하고 현재 표본과 섞지 않습니다. 첫 화면/계층은 제품 코드의 고정 이름 User Timing을 사용하고 이전 measure를 지워 누적량을 제한합니다. 초기 목록 이후에만 사용자 표시 정보·계층 루트·집계를 조회하는 동작을 단위/실제 인증 화면에서 확인합니다. `devtools-user-timing.mjs`는 제품 번들에 포함하지 않으며 측정 세션 종료 때 정리합니다.
-
-## 구성과 실행
-
-```text
-AGENTS.md → 개발 가이드·현재 설계 읽기 → 작은 코드/테스트/문서 변경
-    → 빠른 게이트 → 해당 단위·실제 DB·브라우저·성능 검증
-    → CI의 같은 게이트 → 리뷰·이력 기록
-```
-
-[개발 가이드](DEVELOPMENT_GUIDE.md)는 사람이 판단할 설계·책임·보안·완료 규칙입니다. 아래 도구는 반복 가능한 일부 검사만 자동화합니다. 새 Python 패키지·유료 서비스·외부 AI 호출은 필요하지 않으며 Python 3.9 이상과 Git을 사용합니다.
-
-프로젝트 루트에서:
+## 실행
 
 ```bash
-# 오프라인: 게이트 자체 테스트 → 소스/문서 검사 → git diff --check
-bash scripts/check.sh fast
-
-# 위 검사 + Gradle build + npm ci/단위/타입/빌드/audit
-bash scripts/check.sh full
-
-# 새 깨끗한 Git 체크아웃: 전체 테스트/버전 이미지/격리 runtime/인증·복구
-bash scripts/ci.sh
+bash scripts/check.sh fast  # 오프라인 도구 회귀·소스/문서·공백 검사
+bash scripts/check.sh full  # 위 검사 + Gradle build·프론트 단위/타입/빌드/audit
+bash scripts/ci.sh          # 깨끗한 체크아웃의 이미지·격리 실행·브라우저·인증 검증
 ```
 
-`full`은 Docker 기반 Testcontainers와 의존성/취약점 조회 네트워크가 필요할 수 있습니다. 애플리케이션 runtime을 직접 띄우지는 않으며 실제 화면 E2E·성능 검증을 포함하지 않습니다. 전체 CI도 성능 측정과 실제 작업관리자 메모리 확인을 자동 대체하지 않습니다. 기존 개발 서버를 종료하거나 데이터를 초기화할 필요는 없습니다.
+Testcontainers에는 Docker가 필요합니다. 의존성 다운로드·취약점 조회에는 인터넷 연결이 필요할 수 있습니다. 실제 브라우저 E2E·성능은 fast/full에 포함하지 않습니다. 전체 CI는 [커밋 고정 절차](CI_REPRODUCIBILITY.md)를 사용합니다.
 
-CI 실행자는 Jenkins 하나이며 `scripts/ci_pipeline.py`의 단계를 호출합니다. `scripts/ci.sh`는 같은 검증의 로컬 재현용입니다. Actions workflow는 제거했으며 중복 자동 실행하지 않습니다. 빠른 게이트 실패 시 Gradle/애플리케이션 단계 전에 종료합니다. 전체 CI는 clean commit SHA/tree와 이미지/실행 컨테이너를 검증합니다. [커밋 고정 CI](CI_REPRODUCIBILITY.md)를 참고합니다. 개발용 fast/full은 미커밋 변경도 검사하며 전체 CI의 입력 정책과 구분합니다.
+## 검사 경계
 
-## 자동 검사 범위
-
-후속 CI는 규칙 단위/설정 검사와 격리 백엔드의 실제 중단·독립 수신·해소 알림, 별도 실제 Keycloak 로그인/권한 E2E를 포함합니다. 기능 성능·메모리 측정은 여전히 별도입니다. [인증 CI](AUTHENTICATION_CI.md), [경보 검증](ALERTING_AND_RECOVERY.md)을 참고합니다. 빠른 게이트는 이 네트워크/실제 장애 검증을 실행하지 않고 도구 회귀만 검사합니다.
-
-| 검사 | 실패 조건 |
+| 검사 | 조건 |
 |---|---|
-| 기준 문서 | AGENTS·README·개발/품질/프로젝트/이력 문서 누락 |
-| 텍스트 기본 형식 | UTF-8 아님, CRLF, 마지막 개행 누락, 코드의 후행 공백 |
-| 문서 링크 | 인라인 상대 파일 링크가 검사 대상 텍스트 또는 검증된 docs/images 이미지로 연결되지 않음 |
-| 문서 이미지 | docs/images의 JPEG/PNG가 심볼릭 링크·5MiB 초과·형식 시작/종료 바이트 불일치 |
-| 비밀정보 일부 패턴 | 개인키 헤더·일부 GitHub/OpenAI 키 패턴. 값은 출력하지 않음 |
-| 프론트 경계 | src의 api.ts 외 fetch, raw HTML/동적 코드 실행 패턴, TS 검사 무시 지시 |
-| 서버 경계 | 운영 Java의 JdbcTemplate, Controller의 JPA/SQL/Entity 패키지 import |
-| ORM 기본 설정 | 기본 application.yaml의 OSIV false·ddl-auto validate 누락 |
-| Flyway | 이름/버전 중복·누락, HEAD 대비 이미 커밋한 마이그레이션 수정·삭제 |
-| Gradle | 공식 Wrapper JAR hash·배포 URL/ZIP checksum 불일치, 필수 설정/잠금 파일 누락, POM과 동시 유지 |
-| Git 공백 | git diff --check 실패 |
+| 필수 공개 문서 | AGENTS·README·PROJECT_GUIDE·DEVELOPMENT_GUIDE·QUALITY_GATES |
+| 텍스트 | UTF-8·LF·마지막 개행·코드 후행 공백 |
+| 링크 | 공개 파일/허용 이미지로 연결되는 인라인 상대 링크. 내부 로컬 메모로의 링크는 실패 |
+| 이미지 | docs/images의 JPEG/PNG·5MiB 이하·형식/확장자 일치·심볼릭 링크 거부 |
+| 시크릿 일부 패턴 | 개인키·일부 GitHub/OpenAI 키. 일치 값은 출력하지 않음 |
+| 프론트 | api.ts 밖 fetch·raw HTML/eval·TypeScript 검사 무시 차단 |
+| 서버 | 운영 JDBC 직접 사용·Controller의 JPA/SQL/Entity import 차단 |
+| ORM | OSIV false·ddl-auto validate 유지 |
+| Flyway | 연속 버전·이름 검사, 커밋된 마이그레이션 수정/삭제 거부 |
+| Gradle | 공식 Wrapper JAR/ZIP 체크섬·잠금 파일·필수 설정, POM 동시 유지 차단 |
+| Git | git diff --check |
 
-파일은 `git ls-files --cached --others --exclude-standard`로 수집합니다. 따라서 현재 미커밋 신규 소스도 검사하고 `.local`·node_modules·target·산출물 등 Git 제외 파일은 읽지 않습니다. 이 도구 자체와 회귀 테스트도 검사 대상입니다. 무시 파일의 시크릿·임의 바이너리·원격 웹·전체 Git 이력은 검사하지 않습니다. 예외적으로 docs/images의 .jpg/.jpeg/.png는 파일 크기·시작/종료 바이트만 읽어 문서 링크 대상으로 검증하며, 파일/상위 경로의 심볼릭 링크는 따라가지 않습니다. 첫 실제 Performance 패널 이미지 첨부를 위한 지원이며 문서 링크 검사를 끄거나 모든 바이너리 파일을 허용하지 않습니다.
+파일은 `git ls-files --cached --others --exclude-standard`로 수집합니다. 새 공개 파일도 검사하지만 Git 제외 비밀 설정·내부 기록·빌드 산출물은 읽지 않습니다. 공개 docs의 허용 목록은 .gitignore에 관리합니다. 내부 작업일지는 공개 빌드의 입력이나 필수 문서가 아니며, 새 체크아웃에서도 개인 기록 없이 검증할 수 있습니다.
 
-Gradle의 kts/properties/lockfile/Unix Wrapper도 텍스트 검사에 포함합니다. 공식 Wrapper JAR는 별도 SHA-256 검사로 예외적으로 읽습니다. Windows 생성 스크립트의 공식 CRLF는 유지하며 일반 LF 검사에 포함하지 않습니다. 로컬 Gradle 배포 캐시 전체를 검사하거나 lockfile의 모든 내용까지 이 게이트로 검증하지는 않으며 strict locking 빌드가 의존성 정합성을 확인합니다.
+게이트는 컴파일러·AST 분석기·보안 감사가 아닙니다. 링크 anchor·외부 URL·이미지 속 문자열·전체 Git 이력은 검사하지 않습니다. 문서 분류 변경으로 소스·시크릿·마이그레이션 검사나 기능 테스트 기준을 완화하지 않습니다.
 
-Windows Wrapper는 `.gitattributes`의 해당 경로에만 `-text`와 `cr-at-eol`을 지정해 원본 바이트를 보존합니다. Git 공백 검사에서 CRLF를 후행 공백으로 오인하지 않되 기본 blank-at-eol·blank-at-eof·space-before-tab 검사는 유지합니다. 전역 Git 설정이나 다른 파일의 공백 기준을 변경하지 않습니다.
+## 기능별 검증
 
-마이그레이션 불변 검사는 로컬 HEAD 기준입니다. 브랜치에서 이미 커밋된 과거 수정까지 찾아주는 것은 아니므로 리뷰에서 기준 브랜치와 비교해야 합니다. 이 저장소는 기존 Git HEAD가 있어야 도구를 실행할 수 있습니다.
+| 경계 | 검증 |
+|---|---|
+| 서버 정책·입력·권한 | JUnit/Mockito/MVC |
+| PostgreSQL·JPA·Flyway | Testcontainers·실제 SQL 수·정합성·인덱스·timeout·롤백 |
+| 화면 상태·캐시·폴링 | Vitest·Vue Test Utils·jsdom |
+| 실제 화면/API | Playwright·Chromium |
+| 로그인과 조회 범위 | 별도 Keycloak·실제 PKCE·JWT/JWKS·PostgreSQL |
+| 관측·알림 | 규칙 테스트·격리 장애/복구·발생/해소 알림·SMTP sink |
+| 화면 성능 | 고정 조건 Chrome Performance 및 반복 검증. CI 기능 성공과 별도 판정 |
 
-## 제한과 실패 처리
+최신 실행 결과는 [프로젝트 기준 문서](PROJECT_GUIDE.md), 성능 조건·측정 경계는 [성능 프로토콜](PERFORMANCE.md)에 관리합니다. 측정하지 않은 항목을 다른 도구의 숫자로 대체하지 않습니다.
 
-- 텍스트/정규식 검사입니다. Java/TypeScript AST·타입 검사·보안 감사가 아니며, 별칭/우회·댓글/문자열에 의한 미탐/오탐이 가능합니다.
-- 텍스트 링크는 대상 존재를, 문서 이미지는 제한된 경로·크기·컨테이너 시작/종료 바이트를 확인합니다. 완전한 이미지 디코딩·메타데이터/화면의 개인정보 검출은 아니므로 실제 캡처를 직접 검수해야 합니다. 외부 URL, heading anchor, 참조식 링크는 포함하지 않으며 코드 블록의 예시 링크는 제외합니다.
-- 시크릿 검출은 일부 고확신 패턴뿐입니다. 일반 비밀번호·실사용 이메일·모든 토큰을 자동으로 찾아주지 않으므로 diff 리뷰와 시크릿 저장 규칙이 계속 필요합니다.
-- 기본 JPA 설정 검사는 프로필/환경변수의 모든 재정의를 분석하지 않습니다. Controller가 DTO 대신 Entity를 간접 반환하는지도 이 검사만으로 보장하지 않습니다.
-- 기준 문서의 존재·파일 링크를 검사할 뿐 이력의 새 항목 추가 여부·설계 내용의 정확성·문서와 코드의 의미적 일치는 자동 판정하지 않습니다. AGENTS의 작업 루프와 리뷰로 확인합니다.
-- 숫자 상한, 쿼리 안전성, N+1, SSRF, 취소·타이머 정리, 접근성, 실제 성능은 해당 테스트와 리뷰로 확인합니다.
-- 검사 실패 시 규칙 ID와 파일 경로를 보고 수정합니다. 비밀값을 출력해 원인을 찾지 않습니다. 오탐은 최소 재현 테스트를 추가하고 검사/문서를 함께 고칩니다. 실패를 무시하는 옵션은 제공하지 않습니다.
-
-## 이번 도입의 검증과 후속 범위
-
-2026-10-18 전체 건수의60초 만료 조회에 프론트 회귀4개를 추가해113개를 통과했습니다. 정확한 시간 경계는 제어한 단조 시계·가상 타이머로 검사하고 실제 Keycloak E2E는 최초 집계 후1분 이상 기다려 두 번째 summary 요청을 확인합니다. 실제 인증15개·타입/빌드도 통과했습니다. 느린 집계의 중복 요청·필터/선택 유지·오류/취소 후 이전 숫자 보존·화면 일시정지를 포함하며 API/DB 계약 변경 없이 기존 권한 검증을 사용합니다. 백엔드143개는 WH-053 결과이고 이번에 재실행하지 않았습니다(WH-054).
-
-2026-10-18 GPU 대상 확대의 V6는 과거 마이그레이션을 수정하지 않고 누락 장치만 채웁니다. 서버143개·프론트109개·타입/빌드·실제 Keycloak E2E14개를 통과했습니다. 새 PostgreSQL의100개 GPU Node/200개 장치·seed 멱등, V5 기존40개 장치와 Node 열 보존·반복 이행0건, 데스크톱/모바일 node-002 표시를 확인했습니다. 첫 JPA 버전 기대값5 실패와6으로 수정한 전체 재통과, 실제 V6 반영·성능 미재측정 범위는 WH-053에 기록합니다.
-
-2026-10-18 평가 초기 계정 정책에 오프라인 회귀 2개를 추가해 도구 테스트가 총 73개입니다. 빈 설정 디렉터리에서 공개 평가 계정 생성·재시작 보존과 CI 임시 비밀번호 분리를 검사합니다. 별도 빈 DB 환경의 실제 Keycloak E2E 14개는 fast와 별도로 실행했습니다. 검증 조건과 테스트 데이터 예외는 [인증 설계](AUTHENTICATION.md), WH-046에 기록합니다.
-
-2026-10-18 리소스 진단 추가 후 서버140개·프론트95개·실제 Keycloak E2E14개·타입/빌드를 재검증했습니다. V4/집계/SQL/권한과 1440px/390px 네 유형 상세를 포함하며 [검증 요약](verification/2026-10-18-resource-diagnostics.json)을 참고합니다. 아래 메일 테스트/성능·전체 Jenkins 결과는 각 시점의 별도 기록입니다.
-
-2026-10-18 컨테이너/GPU/현재 Kubernetes Mock 이벤트 확장 후 PostgreSQL/Testcontainers 39개(진단·스키마·인증·Mock 상태 전환·JPA 조회), Gradle 전체 142개, 프론트 98개, 타입 검사, 프로덕션 빌드와 빠른 게이트 73개가 실패·오류·skip 없이 통과했습니다. 실제 Keycloak E2E 14개도 통과했고 인증 Compose에 V5를 적용했습니다. 외부 SMTP 발송, 실제 Kubernetes 연동, Chrome CPU 4× 상세 진단 성능 반복은 이번 검증에 포함되지 않습니다. [통합 기록](WORK_HISTORY.md#wh-047--pod-컨테이너node-gpu현재-kubernetes-mock-이벤트-추가)을 참고합니다.
-
-2026-10-18 관리자 경보 메일은 오프라인 6개와 SMTP 파일 변경 시 재생성 회귀1개를 추가해 전체 71개 도구 회귀를 구성합니다. 서버 125개·화면 89개·실제 Keycloak E2E 12개를 실행했고, 별도 `python3 scripts/test-alert-email.py`에서 실제 Alertmanager의 발생/해소 메일을 내부 SMTP sink로 확인했습니다. 이 SMTP 검증은 `fast`에 포함하지 않으며 실제 계정/외부 메일을 사용하지 않습니다. [메일 검증 경계](ALERT_EMAIL.md)를 참고합니다. 성능 목표 판정은 별도 반복 결과를 사용합니다.
-
-2026-10-18 실제 Chrome Performance JPEG를 처음 연결하며, 텍스트 파일만 링크 대상으로 허용하던 제한으로 README/캡처 문서/이력 세 링크가 실패했습니다. 위 문서 이미지 경계를 추가하고 PNG 정상·누락·잘못된 형식/확장자·크기 초과·Git 제외/허용 경로 밖·심볼릭 링크 회귀 6개를 추가했습니다. 기존 소스/시크릿/마이그레이션 검사는 유지합니다. 실제 결과는 WH-038에 기록합니다.
-
-2026-10-18 단일 PostgreSQL 전환에 오프라인 10개를 추가했습니다. 별도 tmpfs PostgreSQL에서 초기화/데이터 보존·TCP 인증·접속/관리자 권한 거부를 검증하고, 로컬 이행 및 새 인증 환경의 실제 Keycloak 테스트를 각각 10개 통과했습니다. [설계·실행 근거](SHARED_AUTH_DATABASE.md)를 참고하며 이전 전체 Jenkins 결과와 구분합니다.
-
-2026-10-17 로컬 회귀는 기존 46개에 Keycloak 테마의 기본 템플릿 상속/읽기 전용 마운트·이전 계정 이름 매핑의 안전한 중단 검사 2개를 추가해 48개입니다. user1/user2 10만/5만 변경 후 서버 120(실제 PostgreSQL 49)·프론트 83·읽기 전용 실제 API 10·실제 Keycloak 8개를 별도 검증했습니다. 새 전체 Jenkins/이미지/성능을 실행한 것은 아니며 아래 빌드 15의 46개 등은 당시 기록으로 유지합니다. [변경·검증 요약](verification/2026-10-17-user-scopes-theme.json), [설계·제약](USER_SCOPES_AND_LOGIN_THEME.md)을 참고합니다.
-
-최신 오프라인 회귀는 기존 39개에 CI Docker 설정 격리/정리·Desktop socket 매핑 7개를 더한 46개입니다. Jenkins 빌드 15의 새 fixture 체크아웃에서 서버 107(실제 PostgreSQL 44)·프론트 77·기본 브라우저 11·실제 Keycloak 5·경보 9시나리오·실제 복구·이미지 추적·정리를 통과했습니다. [최신 실행 근거](verification/2026-10-16-public-image-ci.json)를 참고합니다. 이전 빌드 11과 아래 도입 수치는 당시 이력으로 유지합니다.
-
-- 게이트 회귀 테스트 19개는 기존 17개에 Gradle metadata/바이너리 오류 차단과 POM 동시 유지 차단을 추가합니다. 문서 누락/링크, 비밀값 비출력, 프론트/서버 경계, ORM 설정, Flyway 버전, 텍스트 형식의 정상·실패 사례를 다룹니다. 임시 Git 저장소에서 커밋된 마이그레이션의 수정·스테이징·삭제 차단과 신규 버전 허용·Git 제외 시크릿 미검사도 확인합니다. 테스트의 임시 저장소 외에 실제 프로젝트 Git 이력은 변경하지 않습니다.
-- 도입 시 `bash scripts/check.sh full`로 게이트 17개와 텍스트 134개, Maven 87개·Vitest 66개, npm ci·타입/빌드·audit 0건을 확인했습니다. 셸 문법도 통과했습니다. 기존 E2E 11개·Jenkins 빌드 6·성능 통과 기록은 이번에 재실행하지 않았으며 새 로컬 검사와 구분합니다.
-- 이후 Gradle 전환에서는 게이트 19개·텍스트 139개와 Jenkins 빌드 7의 Gradle 87개·Vitest 66개·실제 API Chromium 11개·이미지/격리 Compose/Prometheus/정리를 실제 검증했습니다. 이전 도입 결과와 새 전환 결과는 [작업 이력](WORK_HISTORY.md)에서 구분합니다.
-- 들여쓰기·import·코드 복잡도까지 강제하는 정식 formatter/linter나 AST 아키텍처 검사는 추가하지 않았습니다. 일괄 재포맷과 새 의존성을 먼저 늘리지 않고 현재 경계부터 검사합니다.
-
-운영 격리·시크릿·CI 과정은 [운영/CI 문서](OPERATIONS_AND_DELIVERY.md), 누적 변경과 실행 결과는 [작업 이력](WORK_HISTORY.md)에 관리합니다.
+Jenkins는 전체 SHA를 독립 체크아웃하고 검증·이미지·실행 컨테이너를 연결합니다. 미커밋 파일은 CI 입력으로 사용하지 않습니다. 단계 실패를 성공으로 변환하지 않고 성공/실패 모두 CI 프로젝트만 정리합니다. 사용자 DB·서비스는 정리 대상이 아닙니다. [개발 규칙](DEVELOPMENT_GUIDE.md), [인증 CI](AUTHENTICATION_CI.md), [경보와 복구](ALERTING_AND_RECOVERY.md)를 함께 적용합니다.

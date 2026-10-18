@@ -23,6 +23,10 @@ class QualityGateTest(unittest.TestCase):
     def test_required_documents(self):
         self.assertTrue(any("required-document" in error for error in check_files({})))
 
+    def test_public_checkout_does_not_require_private_history(self):
+        self.assertNotIn("docs/WORK_HISTORY.md", REQUIRED)
+        self.assertEqual([], check_files(self.snapshot()))
+
     def test_relative_document_link_and_anchor(self):
         files = self.snapshot(**{"docs/nested/guide.md": "[Guide](../PROJECT_GUIDE.md#purpose)\n"})
         self.assertEqual([], check_files(files))
@@ -30,6 +34,10 @@ class QualityGateTest(unittest.TestCase):
     def test_broken_local_link(self):
         errors = check_files(self.snapshot(**{"README.md": "[Missing](docs/absent.md)\n"}))
         self.assertIn("local-document-link: README.md", errors)
+
+    def test_unterminated_document_link_is_rejected(self):
+        errors = check_files(self.snapshot(**{"README.md": "[Guide](docs/PROJECT_GUIDE.\n"}))
+        self.assertIn("unterminated-document-link: README.md", errors)
 
     def test_external_links_and_code_examples_are_not_resolved(self):
         files = self.snapshot(**{"README.md": "[External](https://example.invalid)\n```md\n[x](absent.md)\n```\n"})
@@ -119,6 +127,14 @@ class GitBoundaryTest(unittest.TestCase):
         target.write_bytes(base64.b64decode(
             "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j3f8AAAAASUVORK5CYII="))
         return target
+
+    def test_private_notes_cannot_be_linked_from_public_readme(self):
+        path = ".local/internal-docs/WORK_HISTORY.md"
+        self.write(path, "# Private history\n")
+        self.write("README.md", f"[History]({path})\n")
+        result, output = self.invoke()
+        self.assertEqual(1, result)
+        self.assertIn("local-document-link: README.md", output)
 
     def test_document_image_links_accept_bounded_png_without_utf8_decoding(self):
         self.image_fixture()

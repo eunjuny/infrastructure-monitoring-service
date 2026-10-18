@@ -4,7 +4,7 @@
 
 ## 선택 이유와 범위
 
-사용자의 Gradle 전환 요청에 따라 초기 Maven 빌드를 Gradle Kotlin DSL로 변경했습니다. Maven이 과제에 부적합해서가 아니며, 빌드 속도 개선 수치를 주장하지 않습니다. 사용자가 선호하는 도구로 개발·검증·컨테이너·CI 명령을 통일하고 Wrapper와 잠금 파일로 버전 재현성을 보강합니다.
+개발·검증·컨테이너·CI의 빌드 명령을 Gradle Kotlin DSL로 통일했습니다. Wrapper와 의존성 잠금 파일로 도구·라이브러리 버전을 고정하고, Java toolchain·JUnit·bootJar 설정을 저장소에서 관리합니다.
 
 Java 21·Spring Boot 3.5.16·JPA·Flyway·Testcontainers와 서비스 코드, API·스키마·DB 데이터는 유지합니다. `backend/pom.xml`은 제거해 두 빌드 체계가 충돌하지 않게 했습니다. Git의 이전 커밋과 Git 제외 로컬 백업에는 전환 전 구성을 보존합니다. 과거 Maven 테스트 결과는 해당 시점의 기록입니다.
 
@@ -67,18 +67,6 @@ Wrapper 버전 변경은 공식 체크섬을 확인하고 `tasks.wrapper`, prope
 - Jenkins JUnit XML 경로는 `backend/build/test-results/test/TEST-*.xml`입니다. HTML은 `backend/build/reports/tests/test/`에 있습니다.
 - CI는 Jenkins로 통일했으며 저장소 Wrapper·strict lockfile·품질 게이트의 체크섬 검증과 새 결과 경로 수집을 유지합니다. 기존 Actions workflow는 제거했습니다.
 
-## 검증 기록
+## 검증
 
-| 검증 | 전환 후 결과 |
-|---|---|
-| Gradle clean build | 기존 87개 테스트, 실패·오류·skip 0; 실제 PostgreSQL 통합 30개 포함 |
-| Wrapper | 8.14.3 다운로드 ZIP checksum과 공식 JAR SHA-256 일치 |
-| 의존성 비교 | 전환 전 Maven의 test compile/runtime 122개 모듈 버전 모두 유지, Gradle의 JUnit launcher만 추가(총 123개, BOM 제외) |
-| 게이트 | 회귀 19개·텍스트 139개 검사·셸 문법·공백 검사 통과 |
-| Jenkins | 빌드 7 SUCCESS, 새 Gradle XML 결과 수집 성공, 익명 접근 차단·비밀값 미노출 |
-| 전체 파이프라인 | Gradle 87개 → Vitest 66개·타입/빌드/audit 0건 → Docker 이미지·격리 Compose → 실제 API Chromium 11개 → Prometheus up=1 → CI 컨테이너 정리 |
-| 호스트 실행 | Gradle bootJar의 고유 런타임 복사본으로 mock 기동, health UP·기존 10만 Pod·Flyway V1~V3 유지 |
-
-첫 의존성 snapshot은 runtime만 비교해 compile-only API Guardian을 누락으로 보았습니다. 보고서를 test compile/runtime 합집합으로 수정해 전환 전 대상과 같은 범위로 대조했습니다. CI clean이 감사 보고서를 삭제한 경우에는 CI 완료 뒤 재생성해 비교했으며 서비스 데이터는 변경하지 않았습니다.
-
-bootJar에 실제 애플리케이션·Flyway V1~V3를 확인하고 JUnit/Testcontainers와 test seed가 서비스 JAR에 포함되지 않는 것을 검사했습니다. 기존 개발 DB·볼륨을 삭제하지 않았습니다. 빌드 6 등 Maven 기록은 유지합니다. GitHub 원격 실행·깨끗한 체크아웃·브라우저 성능 재측정은 이번 결과에 포함하지 않습니다. 상세 이력은 [작업 이력](WORK_HISTORY.md)에 있습니다.
+Wrapper 배포 ZIP/JAR의 공식 체크섬과 strict lockfile을 검사합니다. `build`가 JUnit/Testcontainers를 실행하고, Jenkins가 JUnit XML과 이미지·실행 컨테이너 일치를 확인합니다. 현재 실행 결과는 [기준 문서](PROJECT_GUIDE.md)에 관리합니다.

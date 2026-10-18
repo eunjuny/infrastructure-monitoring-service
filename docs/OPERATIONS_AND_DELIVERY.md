@@ -74,7 +74,7 @@ Spring Boot HTTP / JPA 조회 / Mock 배치 / JVM / HikariCP
 
 수집 성공은 관리 endpoint의 지표 응답을 읽었다는 뜻이며 모든 API·DB 기능의 정상을 보장하지 않습니다. 카드 표현만 바꾸고 API의 숫자형 `up` 계약은 유지합니다. Prometheus가 리소스 테이블을 직접 조회하는 구조가 아니라 HTTP 계측·JVM 런타임·HikariCP 상태를 Actuator에서 읽습니다. heap과 활성 연결은 Mock 값이 아닙니다. 별도 PostgreSQL exporter는 구성하지 않았습니다.
 
-P95는 느린 요청이나 예외를 제거한 평균이 아닙니다. 정의한 구간의 약 95%가 그 이하라는 분포 지표이며 현재 API 조회식은 성공 상태만 골라내지 않습니다. 나머지 5%의 지연과 오류도 별도로 확인해야 합니다. heap은 GC 후 추세·최대치·부하와 함께 판단하고 활성 연결은 현재 빌려준 풀 연결 수로 읽습니다. 상세 예시와 모드/기술 선택 근거는 [질문별 학습 문서](STUDY_QUESTIONS.md)에 정리합니다.
+P95는 느린 요청이나 예외를 제거한 평균이 아닙니다. 정의한 구간의 약 95%가 그 이하라는 분포 지표이며 현재 API 조회식은 성공 상태만 골라내지 않습니다. 나머지 5%의 지연과 오류도 별도로 확인해야 합니다. heap은 GC 후 추세·최대치·부하와 함께 판단하고 활성 연결은 현재 빌려준 풀 연결 수로 읽습니다.
 
 API·DB P95 차트는 최근 30분을 표시합니다. DB Timer는 JPA 조회 구성·SQL 왕복·DTO 조립을 포함한 Repository 호출 구간이며 순수 DB 내부 실행 시간은 아닙니다. 전체 유형 검색은 최대 4개의 SQL을 합친 구간으로 기록합니다. 범위 유효성 검증과 모든 상세 SQL은 포함하지 않으며 HTTP Timer와 구간이 다릅니다. P95는 Histogram 버킷으로 계산한 근삿값이고 브라우저 렌더링 시간이나 과제의 500ms 목표와 같지 않습니다. `increase`는 수집 간격을 외삽하므로 정수 Counter도 소수로 나올 수 있습니다.
 
@@ -117,8 +117,6 @@ DB health → Flyway 백엔드 health → 15만 건 idempotent seed 완료 → N
 
 ## 5. CI / Jenkins
 
-최신 검증은 fixture 커밋 독립 체크아웃의 **Jenkins 빌드 15 SUCCESS**입니다. 서버 107(실제 PostgreSQL 44)·프론트 77·빠른 검사 46·기본 E2E 11·실제 Keycloak 5·경보 9시나리오·실제 복구와 SHA/build/이미지/실행 컨테이너 일치를 통과했습니다. 공개 이미지용 CI 클라이언트를 개인 키체인과 분리하고 macOS의 호스트/VM socket 차이를 처리했습니다. 기존 서비스·설정은 보존하며 Docker 전체를 재시작하지 않았습니다. [최신 실행 근거](verification/2026-10-16-public-image-ci.json), [분리 설계와 한계](CI_REPRODUCIBILITY.md#공개-이미지와-개인-docker-설정-분리)를 참고합니다. 원본 커밋·푸시와 원격 SCM/webhook은 별도이며 이전 빌드 11과 도입 당시 기록은 보존합니다.
-
 후속 확장은 [인증 CI](AUTHENTICATION_CI.md)와 [경보 규칙·실제 중단/복구 검증](ALERTING_AND_RECOVERY.md)입니다. promtool/amtool 검사와 기본 화면 검증 후 CI 백엔드만 중단해 firing·독립 수신·재기동·resolved·10만 데이터 보존을 확인합니다. 이후 별도 CI Keycloak에서 실제 로그인/권한을 검증하고 CI 컨테이너를 정리합니다. 인증 JUnit/요약과 복구 수치 요약을 수집합니다. Keycloak은 Jenkins 인증/배포 실행자가 아닌 서비스 로그인 검증 대상이며 기존 개발·인증 DB를 초기화하거나 외부 메일을 보내지 않습니다. 아래 도입 당시 검증과 최신 실행 결과는 구분합니다.
 
 `bash scripts/ci.sh`는 새 깨끗한 Git 체크아웃에서 다음 흐름을 로컬 재현합니다. CI 실행자는 Jenkins 하나이며 같은 단계 함수를 호출합니다. Actions workflow는 제거했습니다. [커밋 고정·이미지 추적](CI_REPRODUCIBILITY.md)을 참고합니다.
@@ -142,48 +140,8 @@ Jenkins는 `python3 scripts/jenkins-local.py`로 controller·로컬 agent·검�
 - Jenkins에서 테스트 결과·커밋/tree·build/image ID·실행 이미지 확인 산출물을 보관합니다. GitHub는 소스 저장소로 사용할 수 있지만 Actions CI는 운영하지 않습니다. Jenkins 원격 SCM/webhook은 아직 별도 연결 대상입니다.
 - 이미지 버전 태그와 npm 잠금 파일을 사용합니다. 모든 컨테이너·Jenkins plugin이 digest/버전 고정된 완전 재현 빌드인 것은 아닙니다.
 
-## 6. 초기 JDBC 선택과 현재 JPA 전환
+## 6. 저장 조회와 검증
 
-초기에는 고정된 4단계 계층의 읽기 중심 요구에 맞춰 JdbcTemplate으로 필요한 열·JOIN·keyset을 직접 관리했습니다. JDBC가 JPA보다 항상 빠르다는 판단은 아니었습니다.
+운영 조회는 JPA DTO projection, 부모 LAZY, OSIV off, readOnly와 keyset을 사용합니다. 전체 유형 검색은 최대4개 제한 쿼리·합산101개입니다. 배치의 원자적 CTE·보관 삭제는 JPA native query를 사용합니다. 실제 DB에서 SQL 수·Entity 로딩·인덱스·timeout·롤백을 검증합니다.
 
-현재는 공고의 JPA/Hibernate 요구와 사용자 요청에 따라 Entity 매핑·JPA DTO projection으로 전환했습니다. 부모 LAZY·Entity 응답 금지·OSIV off·readOnly·keyset·조회량 상한을 유지합니다. 전체 유형 검색은 기존 단일 UNION 대신 최대 4개의 제한된 DTO 쿼리를 사용하고 최대 101개까지만 반환합니다. Mock의 원자적 CTE와 보관 삭제는 JPA native query로 유지합니다. 실제 DB에서 SQL 횟수·Entity 로딩 0·인덱스·timeout을 검증합니다. [전환 설계·제약·검증](JPA_QUERY_DESIGN.md)을 참고합니다. 아래 빌드 4와 `feature-extension` 측정은 JPA 전환 전 JDBC 기준이며 최신 JPA 결과와 구분합니다.
-
-## 검증 근거 — 2026-10-14
-
-후속 인증 추가의 **Jenkins 빌드 8 SUCCESS**: Gradle 96개·Vitest 73개·기본 실제 API E2E 11개, 이미지·격리 Compose·Prometheus·정리를 확인했습니다. 별도 인증 프로젝트에서는 실제 Keycloak E2E 5개로 관리자/A/B와 교차 조회·로그아웃을 검증했습니다. [인증 문서](AUTHENTICATION.md)를 참고합니다. 빌드 8은 기존 비인증 runtime 회귀와 서버 인증 테스트를 포함하며 실제 Keycloak 브라우저 환경은 별도 실행입니다. 아래 빌드 7·6 등은 이전 단계 기록입니다.
-
-**Gradle 전환 후 최신 Jenkins 빌드 7 SUCCESS**: Wrapper 기반 clean build의 87개·Vitest 66개·실제 API Chromium 11개, 이미지·격리 Compose·Prometheus·CI 정리를 통과했습니다. 새 `build/test-results/test` XML 수집·익명 차단·비밀값 미노출을 확인했습니다. 호스트 Gradle 실행 스크립트도 기동·health·기존 10만 건을 확인했습니다. 빌드 속도·브라우저 성능은 이번 전환에서 비교하지 않았습니다. [Gradle 기록](GRADLE_BUILD.md)을 참고합니다. 아래 빌드 6·5·4는 Maven 당시 기록입니다.
-
-초기 진입 추가 개선 당시 **Jenkins 빌드 6 SUCCESS**: Maven 87개·Vitest 66개·실제 API Chromium 11개, 전체 이미지·격리 Compose·Prometheus·정리를 재통과했습니다. 최종 초기 진입은 총 60회 모두 500ms 이내였습니다. [성능·기능·중간 실패 기록](STARTUP_PERFORMANCE.md)을 참고합니다. 아래 빌드 5·4는 해당 단계의 기록으로 유지합니다.
-
-최신 JPA 버전은 **Jenkins 빌드 5 SUCCESS**, Maven 87개(실제 PostgreSQL 30개 포함)·Vitest 61개·실제 API Chromium 10개를 통과했습니다. 이미지 빌드·격리 Compose·Prometheus up·CI 정리·비밀값 미노출도 확인했습니다. JPA의 실제 SQL·N+1·매핑·timeout 근거는 [전환 문서](JPA_QUERY_DESIGN.md)를 참고합니다. 아래 기존 79개·빌드 4·`feature-extension` 성능은 JPA 전환 전 기록입니다.
-
-JPA 버전의 기본 브라우저 성능도 동일 조건으로 재측정했습니다. 초기 20회 중 첫 1회만 500ms를 초과했으며 다른 탐색 목표 초과는 없었습니다. [전후 비교·측정 한계](JPA_QUERY_DESIGN.md#전환-전후-브라우저-성능)를 참고합니다.
-
-- Maven 79개 통과: 실제 PostgreSQL Testcontainers 22개 포함, 실패·오류·skip 0.
-- Vitest 61개·타입 검사·프로덕션 빌드 통과, 실제 DB/API Chromium E2E 10개 통과.
-- Flyway V1~V3·10만 건 seed·범위 필터·이력 커밋/롤백/정리·고정 PromQL·응답 상한/시간 제한 검증.
-- 전체 Compose의 DB·백엔드·NGINX·Prometheus를 기동하고 실제 `up=1` 및 운영 지표 응답을 확인했습니다.
-- 로컬 Jenkins **빌드 4 SUCCESS**: Maven 79개·Vitest 61개·Chromium 10개·전체 이미지 빌드·격리 Compose·Prometheus up 확인·CI 정리를 완료했습니다. 익명 접근 차단·콘솔 비밀값 미노출도 검사했습니다.
-- 이전 CPU 4x 성능 보고서는 확장 전 기준입니다. 확장 후 아래 동일 조건으로 다시 측정했으며 실제 Chrome 작업관리자 탭 메모리는 Mac 잠금으로 미확인입니다.
-
-### 확장 후 기존 탐색 성능 재측정
-
-`PERF_LABEL=feature-extension npm run test:performance`로 호스트 프로덕션 preview·실제 PostgreSQL에서 CPU 4x·캐시 OFF·1440×1000·20회씩 측정했습니다. 아래는 기존 탐색 동작 회귀 확인이며 새 범위 필터와 운영 지표의 성능 목표를 검증한 수치는 아닙니다.
-
-| 동작 | P95(ms) | 최대(ms) | 목표 초과 |
-|---|---:|---:|---:|
-| 초기 진입 | 366.3 | 645.3 | 1/20 (500ms 목표) |
-| 미캐시 펼침 | 45.9 | 57.7 | 0/20 |
-| 캐시 펼침 | 30.4 | 30.9 | 0/20 |
-| 접기 | 29.9 | 30.5 | 0/20 |
-| 선택적 이름 검색 | 66.3 | 68.2 | 0/20 |
-| 상태 필터 | 50.0 | 83.3 | 0/20 |
-| 현재 페이지 갱신 | 60.8 | 61.2 | 0/20 |
-| 5페이지 갱신 | 80.9 | 81.1 | 0/20 |
-
-첫 초기 진입에서 422ms long task가 관측됐습니다. 정확한 원인을 단정하지 않으며 첫 진입 JS 실행·렌더링 추가 프로파일링이 필요합니다. 표본을 제외하거나 전부 통과했다고 표현하지 않습니다. 측정 오류는 0, 합성 스크롤 compositor는 약 59.85FPS, 추가 100페이지 후 캐시 500개·표시 행 14개였습니다. 합성 FPS와 renderer RSS는 실제 사용자 스크롤·Chrome 작업관리자 탭 메모리를 대체하지 않습니다.
-
-원본 JSON·trace는 Git 제외 `frontend/.validation/performance/feature-extension*.json`, 휴대 가능한 요약은 [측정·CI 요약](performance/2026-10-14-feature-summary.json)에 저장했습니다. 다음 성능 개선은 첫 진입 실행 구간 분석과 비초기 화면 코드 지연 로딩 검토입니다.
-
-API 세부 계약은 [API.md](API.md), 전체 기능은 [PROJECT_GUIDE.md](PROJECT_GUIDE.md), 초기 성능 근거는 [PERFORMANCE_RESULTS.md](PERFORMANCE_RESULTS.md)를 참고합니다.
+[API](API.md), [JPA](JPA_QUERY_DESIGN.md), [기준 문서](PROJECT_GUIDE.md), [성능 측정](PERFORMANCE.md)을 참고합니다.
