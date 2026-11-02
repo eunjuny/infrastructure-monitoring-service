@@ -22,6 +22,8 @@ ROOT = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser()
 parser.add_argument('--repository', type=Path, default=ROOT, help='Trusted local Git repository')
 parser.add_argument('--revision', default='HEAD', help='Commit/ref resolved once before dispatch')
+parser.add_argument('--deploy-local', action='store_true', help='Deploy successful verified images to this local environment')
+parser.add_argument('--prepare-only', action='store_true', help='Ensure controller and agent are connected without scheduling a build')
 args = parser.parse_args()
 repository = args.repository.resolve()
 try:
@@ -45,7 +47,7 @@ password = password_path.read_text().strip()
 if len(password) < 24:
     raise SystemExit('Local CI secret is invalid')
 with public_registry_environment(dict(os.environ)) as docker_env:
-    subprocess.run(['docker', 'compose', '-f', 'compose.jenkins.yaml', 'up', '-d', '--build'],
+    subprocess.run(['docker', 'compose', '-f', 'compose.jenkins.yaml', 'up', '-d', '--no-build' if args.prepare_only else '--build'],
                    cwd=ROOT, env=docker_env, check=True)
 opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
 authorization = 'Basic ' + base64.b64encode(('ci-admin:' + password).encode()).decode()
@@ -112,6 +114,9 @@ for attempt in range(40):
     time.sleep(1)
 else:
     raise SystemExit('Local agent did not connect; inspect the ignored agent log')
+if args.prepare_only:
+    print('Jenkins controller and agent ready', flush=True)
+    sys.exit(0)
 job = ET.Element('flow-definition', {'plugin': 'workflow-job'})
 ET.SubElement(job, 'description').text = 'Exact committed revision checkout; trusted local Git transport, isolated build workspace'
 ET.SubElement(job, 'keepDependencies').text = 'false'
@@ -122,6 +127,12 @@ for name, value in [('SOURCE_REPOSITORY', str(repository)), ('SOURCE_REVISION', 
     parameter = ET.SubElement(definitions, 'hudson.model.StringParameterDefinition')
     ET.SubElement(parameter, 'name').text = name
     ET.SubElement(parameter, 'defaultValue').text = value
+parameter = ET.SubElement(definitions, 'hudson.model.BooleanParameterDefinition')
+ET.SubElement(parameter, 'name').text = 'DEPLOY_LOCAL'
+ET.SubElement(parameter, 'defaultValue').text = 'true' if args.deploy_local else 'false'
+parameter = ET.SubElement(definitions, 'hudson.model.StringParameterDefinition')
+ET.SubElement(parameter, 'name').text = 'DEPLOY_TARGET'
+ET.SubElement(parameter, 'defaultValue').text = str(ROOT)
 definition = ET.SubElement(job, 'definition', {'class': 'org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition', 'plugin': 'workflow-cps'})
 ET.SubElement(definition, 'script').text = pipeline_source
 ET.SubElement(definition, 'sandbox').text = 'true'
@@ -135,7 +146,7 @@ except urllib.error.HTTPError as error:
         raise
     request('/createItem?name=' + job_name, ET.tostring(job), 'application/xml')
 number = json.loads(request('/job/' + job_name + '/api/json'))['nextBuildNumber']
-request('/job/' + job_name + '/buildWithParameters?' + urllib.parse.urlencode({'SOURCE_REPOSITORY': str(repository), 'SOURCE_REVISION': revision}), b'')
+request('/job/' + job_name + '/buildWithParameters?' + urllib.parse.urlencode({'SOURCE_REPOSITORY': str(repository), 'SOURCE_REVISION': revision, 'DEPLOY_LOCAL': str(args.deploy_local).lower(), 'DEPLOY_TARGET': str(ROOT)}), b'')
 print('Jenkins authenticated; pinned commit', revision, 'build', number, 'started', flush=True)
 for attempt in range(150):
     try:

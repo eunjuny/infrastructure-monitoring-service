@@ -8,6 +8,7 @@ services:
       - jenkins-credentials:/credentials
     command: ["sh", "-c", "cp /run/secrets/jenkins_admin_password /credentials/password && chown 1000:1000 /credentials/password && chmod 600 /credentials/password"]
   jenkins:
+    restart: unless-stopped
     build:
       context: .
       dockerfile: infra/jenkins/Dockerfile

@@ -3,6 +3,8 @@ pipeline {
     options { timeout(time: 25, unit: 'MINUTES'); disableConcurrentBuilds(); skipDefaultCheckout(true) }
     parameters {
         string(name: 'SOURCE_REPOSITORY', defaultValue: '', description: 'Trusted local Git repository, not a working source directory')
+        booleanParam(name: 'DEPLOY_LOCAL', defaultValue: false, description: 'Deploy verified images to existing local auth services')
+        string(name: 'DEPLOY_TARGET', defaultValue: '', description: 'Trusted existing local service directory')
         string(name: 'SOURCE_REVISION', defaultValue: '', description: 'Exact full 40-character commit SHA')
     }
     environment {
@@ -53,6 +55,15 @@ python3 scripts/ci_pipeline.py prepare
         }
         stage('Verify source and image identity') {
             steps { dir("runs/${env.BUILD_NUMBER}/source") { sh 'python3 scripts/ci_pipeline.py verify' } }
+        }
+        stage('Deploy verified local images') {
+            when { expression { params.DEPLOY_LOCAL } }
+            environment { LOCAL_DEPLOY_TARGET = "${params.DEPLOY_TARGET}" }
+            steps {
+                dir("runs/${env.BUILD_NUMBER}/source") {
+                    sh 'python3 scripts/deploy-local.py --manifest frontend/.validation/ci/provenance.json --target "$LOCAL_DEPLOY_TARGET"'
+                }
+            }
         }
     }
     post {

@@ -318,3 +318,7 @@ PERF_BROWSER=chrome PERF_FULL=1 PERF_REPETITIONS=20 PERF_LABEL=<새-이름> pyth
 - **워크로드 중심의 장애 분석:** Deployment·StatefulSet·DaemonSet·Job과 소속 Pod를 연결하고, 목표/준비 복제본과 배포 상태를 확인하는 화면으로 확장하고 싶습니다. 문제가 있는 Pod에서 현재·직전 종료 컨테이너 로그와 관련 이벤트를 함께 조회해 애플리케이션 단위로 장애 원인을 좁힐 수 있도록 합니다.
 - **네트워크·스토리지 연결 관계:** Service·EndpointSlice·Ingress와 대상 Pod, PVC·PV의 연결 상태를 함께 보여주고 싶습니다. Pod 상태만으로 드러나지 않는 연결 대상 누락이나 볼륨 연결 실패를 관련 리소스까지 이어서 확인하는 방향입니다.
 - **자원 배정·스케줄링 진단:** 실제 CPU·메모리·GPU 요청량과 할당 가능량, Namespace별 ResourceQuota를 비교하고 Pending Pod의 이벤트·Node 조건을 연결하고 싶습니다. 단순 사용률 표시를 넘어 자원 부족이나 배치 조건 때문에 실행되지 못하는 원인을 확인하도록 확장합니다.
+
+### dev 브랜치 자동 CI/CD
+
+기본 서비스 실행 후 `python3 scripts/install-dev-cicd.py`로 Mac의 원격 dev 감지를 등록할 수 있습니다. 60초마다 원격 변경을 확인하고 Jenkins가 해당 커밋의 빌드·DB·화면·인증 검증을 수행한 뒤 검증한 로컬 이미지로 서비스를 교체합니다. Docker Hub/Nexus 없이 같은 Docker Desktop의 이미지를 사용합니다. 사용자 로그인·네트워크·Docker Desktop이 필요하며, 교체 중 짧은 접속 중단이 있을 수 있습니다. 기존 DB/Keycloak을 유지하고 배포 전 DB 백업을 남깁니다. 실패 시 이전 이미지 복원을 시도하지만 DB 마이그레이션 복구는 별도 확인이 필요합니다. 상세 정책은 `docs/CI_REPRODUCIBILITY.md`에 정리했습니다.
