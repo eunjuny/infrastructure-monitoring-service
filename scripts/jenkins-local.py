@@ -24,6 +24,7 @@ parser.add_argument('--repository', type=Path, default=ROOT, help='Trusted local
 parser.add_argument('--revision', default='HEAD', help='Commit/ref resolved once before dispatch')
 parser.add_argument('--deploy-local', action='store_true', help='Deploy successful verified images to this local environment')
 parser.add_argument('--prepare-only', action='store_true', help='Ensure controller and agent are connected without scheduling a build')
+parser.add_argument('--build-controller', action='store_true', help='Build controller image during first installation')
 args = parser.parse_args()
 repository = args.repository.resolve()
 try:
@@ -47,7 +48,7 @@ password = password_path.read_text().strip()
 if len(password) < 24:
     raise SystemExit('Local CI secret is invalid')
 with public_registry_environment(dict(os.environ)) as docker_env:
-    subprocess.run(['docker', 'compose', '-f', 'compose.jenkins.yaml', 'up', '-d', '--no-build' if args.prepare_only else '--build'],
+    subprocess.run(['docker', 'compose', '-f', 'compose.jenkins.yaml', 'up', '-d', '--no-build' if args.prepare_only and not args.build_controller else '--build'],
                    cwd=ROOT, env=docker_env, check=True)
 opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
 authorization = 'Basic ' + base64.b64encode(('ci-admin:' + password).encode()).decode()
