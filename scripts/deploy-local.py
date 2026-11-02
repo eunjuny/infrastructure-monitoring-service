@@ -66,6 +66,15 @@ def deploy(report, target):
             previous = {service: container(service)['Image'] for service in SERVICES}
             database = container('db')
             mounts = database['Mounts']
+            identity_container = container('keycloak')['Id']
+            def resource_counts():
+                return run(['docker', 'exec', database['Id'], 'psql', '-U', 'infrastructure_admin',
+                            '-d', 'monitoring', '-At', '-c',
+                            'SELECT (SELECT count(*) FROM infrastructure_cluster), '
+                            '(SELECT count(*) FROM infrastructure_node), '
+                            '(SELECT count(*) FROM infrastructure_namespace), '
+                            '(SELECT count(*) FROM infrastructure_pod)']).strip()
+            original_counts = resource_counts()
             before = {'commit': report['commit'], 'buildId': report['buildId'], 'previous': previous,
                       'images': {service: report['images'][key]['id'] for service, key in SERVICES.items()}}
             private_json(directory / 'pending.json', before)
@@ -107,7 +116,10 @@ def deploy(report, target):
                     raise ValueError('Running images differ from verified images')
                 if container('db')['Id'] != database['Id'] or container('db')['Mounts'] != mounts:
                     raise ValueError('Database container or volumes changed')
-                private_json(directory / 'current.json', {**before, 'result': 'deployed', 'backup': backup.name})
+                if container('keycloak')['Id'] != identity_container or resource_counts() != original_counts:
+                    raise ValueError('Identity service or resource counts changed')
+                private_json(directory / 'current.json', {**before, 'result': 'deployed', 'backup': backup.name,
+                                                        'resourceCounts': original_counts})
             except Exception:
                 # Image rollback does not undo a database migration. Preserve backup for manual recovery.
                 try:

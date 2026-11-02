@@ -92,3 +92,7 @@ Jenkins의 `DEPLOY_LOCAL`을 켜면 모든 CI 단계 성공 후 `scripts/deploy-
 배포 전 monitoring DB의 pg_dump 백업을 비공개 `.local/deployment/`에 저장합니다. 이미지 ID·컨테이너 상태·웹 경유 인증 설정 응답과 기존 DB 컨테이너/마운트를 확인하고 성공 기록을 남깁니다. 이는 전체 사용자 시나리오 무중단 보장이 아니며 교체 중 잠시 접속이 끊길 수 있습니다. 실패 시 이전 이미지로 복원을 시도하며 결과와 백업 경로를 보존합니다. Flyway 변경은 이미지 복원으로 취소되지 않으므로 실패 시 DB 호환성 점검과 필요하면 백업 복구가 필요합니다. 백업은 자동 삭제하지 않으므로 운영자가 보관 공간과 주기를 관리합니다. 합성 SMTP 검증 외에 배포로 발생한 실제 경보는 기존 알림 설정에 따라 전달될 수 있습니다.
 
 현재 배포 결과는 `.local/deployment/current.json`, 자동 감지 상태는 `.local/dev-cicd/state.json`에 있습니다. 로그와 백업에는 로컬 접근 권한을 적용하며 Git에 포함하지 않습니다. 종료는 `launchctl bootout gui/$(id -u)/dev.infrastructure.monitoring.cicd`로 감지를 중단한 뒤 Jenkins 작업 종료 여부를 확인합니다. 감지 종료만으로 실행 중인 빌드나 서비스가 종료되지는 않습니다. Jenkins 정지는 `docker compose -f compose.jenkins.yaml stop`이며 서비스 Compose에는 영향을 주지 않습니다.
+
+### 검증 도구 의존성
+
+CI의 npm audit 중간 등급 이상 차단을 유지합니다. Vitest 4.1.12 패치와 개발용 전이 의존성 glob 14.0.3/minimatch 11.0.1 override를 적용했습니다. override는 보안 패치를 선택하기 위한 설정이며 단위 테스트·타입·번들 검증과 실제 CI로 호환성을 확인합니다. 시스템 npm을 변경하지 않고 잠금 파일을 관리합니다.
