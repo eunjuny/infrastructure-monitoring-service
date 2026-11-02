@@ -23,15 +23,17 @@ test('real seed counts, lazy hierarchy, parent list and typed details', async ({
   await expect(page.locator('#list-heading')).toHaveText('namespace-0001 하위 목록')
   await page.locator('.resource-row').filter({ hasText: 'worker-pod-000001' }).click()
   await expect(page.locator('.detail-panel h3')).toHaveText('worker-pod-000001')
-  await expect(page.locator('.attributes')).toContainText('재시작 횟수')
+  await expect(page.locator('.resource-diagnostics')).toContainText('재시작')
   await expect(page.locator('.resource-diagnostics')).toContainText('컨테이너별 상태')
-  await page.getByRole('button', { name: '이벤트 보기', exact: true }).click()
-  await expect(page.locator('.event-history')).toContainText('리소스 이벤트')
+  await page.getByRole('button', { name: '변경 이력 보기', exact: true }).click()
+  await expect(page.locator('.event-history')).toContainText('상태 변경 이력')
   await expect(page.locator('.event-history')).not.toContainText('생성한 이벤트')
+  await page.getByRole('tab', { name: '관계·경로', exact: true }).click()
   await expect(page.locator('.breadcrumbs button')).toHaveCount(4)
   await page.locator('.breadcrumbs button').filter({ hasText: 'node-001' }).click()
-  await expect(page.locator('.attributes')).toContainText('CPU 사용률 (%)')
-  await expect(page.locator('.attributes')).toContainText('메모리 사용률 (%)')
+  await page.getByRole('tab', { name: '개요', exact: true }).click()
+  await expect(page.locator('.metric-bars')).toContainText('CPU 사용률 (%)')
+  await expect(page.locator('.metric-bars')).toContainText('메모리 사용률 (%)')
   await page.getByRole('button', { name: 'Node 전체 목록 보기' }).click()
   await page.locator('.resource-row').filter({ hasText: 'node-010' }).click()
   await expect(page.locator('.resource-diagnostics')).toContainText('GPU 장치')
@@ -59,6 +61,8 @@ test('optional code is loaded on demand while initial data and timestamps remain
 })
 
 test('database name search, full path reveal and combined status filter', async ({ page }) => {
+  await page.getByRole('button', { name: '전체 Pod', exact: true }).click()
+  await expect(page.locator('.resource-row').first()).toContainText('worker-pod-000001')
   await page.locator('.filters input').fill('worker-pod-000001')
   await expect(page.locator('.resource-row')).toHaveCount(1)
   await expect(page.locator('.resource-row')).toContainText('cluster-01 / node-001 / namespace-0001 / worker-pod-000001')
@@ -88,6 +92,8 @@ test('empty search and invalid requests return safe states', async ({ page, requ
 })
 
 test('cluster and namespace scope stays applied to name and status filtering', async ({ page, request }) => {
+  await page.getByRole('button', { name: '전체 Pod', exact: true }).click()
+  await expect(page.locator('.resource-row').first()).toContainText('worker-pod-000001')
   await page.getByLabel('자동 갱신').uncheck()
   await page.locator('.scope-filters summary').click()
   await page.getByLabel('Cluster 범위', { exact: true }).selectOption('2')
@@ -139,6 +145,8 @@ test('operations screen displays actual Prometheus samples', async ({ page, requ
 })
 
 test('sequential global Pod browsing keeps the 500-row cache and small DOM', async ({ page }) => {
+  await page.getByRole('button', { name: '전체 Pod', exact: true }).click()
+  await expect(page.locator('.resource-row').first()).toContainText('worker-pod-000001')
   await page.getByLabel('자동 갱신').uncheck()
   for (let index = 0; index < 6; index++) {
     const response = page.waitForResponse(value => value.url().includes('/api/resources?') && value.url().includes('cursor=') && value.status() === 200)
@@ -146,13 +154,15 @@ test('sequential global Pod browsing keeps the 500-row cache and small DOM', asy
     await response
     await expect(page.getByRole('button', { name: '다음 100개', exact: true })).toBeEnabled()
   }
-  await expect(page.locator('.list-footer')).toContainText('201–700번째 · 보관 500개')
+  await expect(page.locator('.list-footer')).toContainText('201–700번째 · 500개 표시')
   expect(await page.locator('.resource-row').count()).toBeLessThanOrEqual(20)
   await page.getByRole('button', { name: '처음부터', exact: true }).click()
-  await expect(page.locator('.list-footer')).toContainText('1–100번째 · 보관 100개')
+  await expect(page.locator('.list-footer')).toContainText('1–100번째 · 100개 표시')
 })
 
 test('committed DB changes appear automatically without losing selected detail or scroll', async ({ page, request }) => {
+  await page.getByRole('button', { name: '전체 Pod', exact: true }).click()
+  await expect(page.locator('.resource-row').first()).toContainText('worker-pod-000001')
   await page.locator('.resource-row').filter({ hasText: 'worker-pod-000001' }).click()
   await expect(page.locator('.detail-panel h3')).toHaveText('worker-pod-000001')
   const snapshot = await (await request.get('/api/resources/POD/1')).json()
@@ -203,7 +213,7 @@ test('mobile layout keeps navigation and detail usable without horizontal overfl
   const overflows = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)
   expect(overflows).toBe(false)
   await page.locator('.resource-row').first().click()
-  await expect(page.locator('.detail-panel h3')).toHaveText('worker-pod-000001')
+  await expect(page.locator('.detail-panel h3')).toHaveText('cluster-01')
   await page.getByRole('button', { name: '상세 닫기', exact: true }).click()
   await expect(page.locator('.detail-panel')).toHaveCount(0)
   await page.screenshot({ path: '.validation/screenshots/console-mobile.png', fullPage: true })

@@ -50,6 +50,7 @@ def main():
         state_file.write_text(json.dumps(state) + '\n')
         result = subprocess.run([sys.executable, str(ROOT / 'scripts/jenkins-local.py'), '--repository',
                                  str(mirror), '--revision', sha, '--deploy-local'], cwd=ROOT)
+        state['attemptedAt'] = time.time()
         state['result'] = 'passed' if result.returncode == 0 else 'failed'
         if result.returncode == 0:
             state['deployed'] = sha
