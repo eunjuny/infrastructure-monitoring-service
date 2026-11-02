@@ -6,7 +6,12 @@ import plistlib
 import subprocess
 import sys
 
+from ci_pipeline import public_registry_environment
+
 ROOT = Path(__file__).resolve().parents[1]
+with public_registry_environment(dict(os.environ)) as docker_env:
+    subprocess.run(['docker', 'compose', '-f', 'compose.jenkins.yaml', 'up', '-d', '--build'],
+                   cwd=ROOT, env=docker_env, check=True)
 local = ROOT / '.local/dev-cicd'
 local.mkdir(parents=True, exist_ok=True, mode=0o700)
 label = 'dev.infrastructure.monitoring.cicd'

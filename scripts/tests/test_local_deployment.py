@@ -53,3 +53,31 @@ class DeploymentAdmissionTest(unittest.TestCase):
             self.assertEqual(0o600, path.stat().st_mode & 0o777)
             self.assertIn('deployed', path.read_text())
             self.assertFalse(path.with_suffix('.tmp').exists())
+
+
+class DevBranchDetectionTest(unittest.TestCase):
+    def test_remote_dev_is_selected_independently_of_main(self):
+        import subprocess
+        spec = importlib.util.spec_from_file_location('watch_dev', SCRIPTS / 'watch-dev.py')
+        watcher = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(watcher)
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            subprocess.run(['git', 'init', '-q', str(root / 'remote')], check=True)
+            remote = root / 'remote'
+            def git(*args):
+                return subprocess.check_output(['git', '-C', str(remote), *args], text=True).strip()
+            git('config', 'user.name', 'CI fixture')
+            git('config', 'user.email', 'fixture@example.invalid')
+            (remote / 'file.txt').write_text('dev')
+            git('add', '.')
+            git('commit', '-qm', 'dev fixture')
+            git('branch', 'dev')
+            expected = git('rev-parse', 'dev')
+            (remote / 'file.txt').write_text('main')
+            git('commit', '-qam', 'different head')
+            subprocess.run(['git', 'clone', '-q', str(remote), str(root / 'client')], check=True)
+            self.assertEqual(expected, watcher.remote_revision(root / 'client'))
+            git('branch', '-D', 'dev')
+            with self.assertRaises(subprocess.CalledProcessError):
+                watcher.remote_revision(root / 'client')
