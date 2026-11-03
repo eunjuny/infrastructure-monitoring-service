@@ -79,6 +79,26 @@ docker compose --env-file .local/auth/compose.env -f compose.auth.yaml stop
 
 데이터를 보존하며 멈출 때는 `docker compose --env-file .local/auth/compose.env -f compose.auth.yaml stop`을 사용합니다. `down -v`는 DB 볼륨의 데이터를 삭제하므로 데이터가 필요하면 사용하지 마세요.
 
+### 6. DBeaver로 DB 확인 (선택)
+
+기본 실행에서 PostgreSQL은 Docker 내부에서만 접속할 수 있습니다. 로컬 DB 도구로 확인하려면 최초 실행 후 프로젝트 루트의 `.local/auth/compose.db-local.yaml`에 아래 포트 설정을 추가합니다. `.local/`은 Git에서 제외됩니다.
+
+```yaml
+services:
+  db:
+    ports:
+      - "127.0.0.1:5546:5432"
+```
+
+이후 `python3 scripts/auth-local.py`를 실행하면 포트가 적용됩니다. 이미 실행 중인 환경에서 DB에만 적용하려면 다음 명령을 사용합니다. DB 연결이 잠시 끊길 수 있으며 기존 볼륨은 유지됩니다.
+
+```bash
+docker compose --env-file .local/auth/compose.env \
+  -f compose.auth.yaml -f .local/auth/compose.db-local.yaml up -d --wait db
+```
+
+DBeaver에서 호스트 `127.0.0.1`, 포트 `5546`, 데이터베이스와 사용자 모두 `monitoring`으로 설정합니다. 비밀번호는 `.local/auth/compose.env`의 `AUTH_APP_DB_PASSWORD`를 사용합니다. 매핑을 끄려면 로컬 추가 설정 파일을 다른 이름으로 바꾼 뒤 `python3 scripts/auth-local.py`를 다시 실행합니다.
+
 ## 사용한 기술 및 선택 이유
 
 | 기술 | 적용 이유 |

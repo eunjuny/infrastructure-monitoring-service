@@ -28,7 +28,21 @@ python3 scripts/auth-local.py
 | Prometheus | http://127.0.0.1:9095/ |
 | Alertmanager | http://127.0.0.1:9195/ |
 
-API를 토큰 없이 직접 열었을 때 401은 정상입니다. 서비스에서 로그인해 사용합니다. DB·Actuator 관리 endpoint·내부 수신기는 호스트에 공개하지 않습니다.
+API를 토큰 없이 직접 열었을 때 401은 정상입니다. 서비스에서 로그인해 사용합니다. DB·Actuator 관리 endpoint·내부 수신기는 기본적으로 호스트에 공개하지 않습니다.
+
+### 로컬 DB 도구 연결 (선택)
+
+README의 DBeaver 설정에 따라 Git 제외 `.local/auth/compose.db-local.yaml`에 `127.0.0.1:5546:5432`를 추가합니다. Mac의 `localhost:5432`에서 별도 PostgreSQL을 사용 중이어도 충돌하지 않습니다. 로컬 시작 스크립트는 설정 파일이 있을 때만 추가 Compose 파일로 읽습니다. CI 인증 검증에는 적용하지 않습니다. 검증된 앱 이미지를 교체하는 dev 로컬 CD는 DB를 재생성하지 않으므로 기존 매핑을 유지합니다.
+
+로컬 접속 계정은 조회 대상 DB와 일치시키고, 비밀번호는 `.local/auth/compose.env`에서 해당 키를 확인합니다.
+
+| DB | 사용자 | 비밀번호 키 |
+|---|---|---|
+| `monitoring` | `monitoring` | `AUTH_APP_DB_PASSWORD` |
+| `identity` | `identity` | `AUTH_IDENTITY_DB_PASSWORD` |
+| `postgres` (관리용) | `infrastructure_admin` | `AUTH_DB_ADMIN_PASSWORD` |
+
+매핑의 적용과 해제 시 기존 PostgreSQL 컨테이너가 재생성될 수 있습니다. 데이터는 기존 명명 볼륨에 유지되며 연결은 잠시 끊깁니다. 앱 권한으로 보는 범위와 DB 계정의 접근 범위는 별개이므로 이 경로는 로컬 개발자 점검에 사용합니다.
 
 ### 로그인과 시연
 

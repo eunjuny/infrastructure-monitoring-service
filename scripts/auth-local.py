@@ -113,6 +113,10 @@ def main():
     command = ['docker', 'compose', '--env-file', str(LOCAL / 'compose.env'), '-f', 'compose.auth.yaml']
     if args.ci:
         command += ['-f', 'compose.auth-ci.yaml', '-p', 'infrastructure-monitoring-ci-auth']
+    else:
+        db_override = LOCAL / 'compose.db-local.yaml'
+        if db_override.is_file():
+            command += ['-f', str(db_override)]
     if args.stop:
         if (LOCAL / 'compose.env').exists():
             subprocess.run(command + ['down', '--remove-orphans'], cwd=ROOT, check=True)

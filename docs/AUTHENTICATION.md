@@ -51,7 +51,7 @@ Prometheus → 인증 환경의 backend만 수집 → ADMIN 운영 관측
 
 사용자 식별은 검증된 issuer+sub를 사용합니다. 커서에 issuer/sub/권한 범위의 지문을 연결해 다른 계정이나 권한으로 원본 커서를 재사용하면 400입니다. 커서는 서명된 권한 토큰이 아니며 사용자가 상태를 가공해도 JPA의 실제 접근 제한을 대체/해제할 수 없습니다.
 
-서버는 Bearer 헤더 기반 stateless API입니다. 앱 로그인 세션 쿠키를 사용하지 않아 API CSRF 처리를 비활성화했으며 URL query/form의 토큰이나 Keycloak SSO 쿠키만으로 API에 접근하지 않습니다. API 인증과 Keycloak 브라우저 로그인 쿠키를 구분합니다. 관리 포트·DB는 내부 전용이고 NGINX는 `/actuator`를 차단합니다.
+서버는 Bearer 헤더 기반 stateless API입니다. 앱 로그인 세션 쿠키를 사용하지 않아 API CSRF 처리를 비활성화했으며 URL query/form의 토큰이나 Keycloak SSO 쿠키만으로 API에 접근하지 않습니다. API 인증과 Keycloak 브라우저 로그인 쿠키를 구분합니다. 관리 포트·DB는 기본적으로 내부 전용이고 NGINX는 `/actuator`를 차단합니다. [선택형 로컬 DB 연결](RUNNING.md#로컬-db-도구-연결-선택)은 루프백에서 PostgreSQL 계정으로 접속하는 별도 개발 경로입니다.
 
 ## 브라우저·토큰·주소 경계
 

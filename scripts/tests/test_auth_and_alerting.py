@@ -36,7 +36,7 @@ class AuthenticationAndAlertsTest(unittest.TestCase):
             commands = [subprocess.CompletedProcess([], code) for code in [1, 0] * 2]
             with patch.object(AUTH, 'ROOT', root), patch.object(AUTH, 'LOCAL', root / '.local/auth'), \
                     patch('sys.argv', ['auth-local.py']), \
-                    patch.object(AUTH.subprocess, 'run', side_effect=commands), \
+                    patch.object(AUTH.subprocess, 'run', side_effect=commands) as run, \
                     patch.object(AUTH.urllib.request, 'urlopen', side_effect=responses), redirect_stdout(output):
                 AUTH.main()
                 path = root / '.local/auth/credentials.json'
@@ -45,11 +45,34 @@ class AuthenticationAndAlertsTest(unittest.TestCase):
                 self.assertEqual(['admin', 'user1', 'user2'], [user['username'] for user in imported['users']])
                 self.assertEqual(['1234'] * 3, [user['credentials'][0]['value'] for user in imported['users']])
                 self.assertEqual(0o600, path.stat().st_mode & 0o777)
+                self.assertNotIn('compose.db-local.yaml', ' '.join(run.call_args.args[0]))
+                override = path.parent / 'compose.db-local.yaml'
+                override.write_text('services: {db: {ports: ["127.0.0.1:5546:5432"]}}\n')
                 AUTH.main()
+                self.assertIn(str(override), run.call_args.args[0])
                 self.assertEqual(first, json.loads(path.read_text()))
             for key in ['bootstrap', 'appDatabase', 'identityDatabase', 'databaseAdmin', 'alertEmailControl']:
                 self.assertGreaterEqual(len(first[key]), 32)
                 self.assertNotIn(first[key], output.getvalue())
+
+    def test_ci_ignores_local_db_overrides(self):
+        with TemporaryDirectory(prefix='monitoring-ci-port-') as directory:
+            root = Path(directory)
+            for config_dir in (root / '.local/auth', root / '.local/auth-ci'):
+                config_dir.mkdir(parents=True)
+                (config_dir / 'compose.db-local.yaml').touch()
+            issuer = AUTH.ISSUER.replace(':8183', ':8193')
+            responses = [io.BytesIO(json.dumps(body).encode()) for body in (
+                {'issuer': issuer}, {'enabled': True, 'issuer': issuer},
+            )]
+            with patch.object(AUTH, 'ROOT', root), patch.object(AUTH, 'LOCAL', root / '.local/auth'), \
+                    patch('sys.argv', ['auth-local.py', '--ci']), \
+                    patch.object(AUTH.subprocess, 'run') as run, \
+                    patch.object(AUTH.urllib.request, 'urlopen', side_effect=responses), redirect_stdout(io.StringIO()):
+                AUTH.main()
+            command = run.call_args.args[0]
+            self.assertIn('compose.auth-ci.yaml', command)
+            self.assertNotIn('compose.db-local.yaml', ' '.join(command))
 
     def test_ci_accounts_keep_distinct_random_passwords(self):
         first = AUTH.initial_credentials(ci=True)
